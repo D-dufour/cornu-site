@@ -1,0 +1,6 @@
+# The unencrypted site. Never commit this — GitHub Pages repos are public
+# on free accounts, and this folder is the whole site in plain text.
+source/
+
+node_modules/
+.DS_Store
