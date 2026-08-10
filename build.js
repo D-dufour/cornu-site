@@ -36,6 +36,10 @@ function inline() {
     () => '<script>\n' + js + '\n</script>');
   html = html.replace(/<link rel="icon"[^>]*>/,
     () => '<link rel="icon" href="data:image/svg+xml,' + encodeURIComponent(ico.trim()) + '">');
+  html = html.replace(/src="(assets\/img\/partners\/[^".]+\.png)"/g, (match, rel) => {
+    const data = fs.readFileSync(path.join(SRC, rel)).toString('base64');
+    return 'src="data:image/png;base64,' + data + '"';
+  });
 
   const withoutComments = html.replace(/<!--[\s\S]*?-->/g, '');
   if (/(href|src)="assets\//.test(withoutComments)) {
