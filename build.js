@@ -36,9 +36,12 @@ function inline() {
     () => '<script>\n' + js + '\n</script>');
   html = html.replace(/<link rel="icon"[^>]*>/,
     () => '<link rel="icon" href="data:image/svg+xml,' + encodeURIComponent(ico.trim()) + '">');
-  html = html.replace(/src="(assets\/img\/partners\/[^".]+\.png)"/g, (match, rel) => {
-    const data = fs.readFileSync(path.join(SRC, rel)).toString('base64');
-    return 'src="data:image/png;base64,' + data + '"';
+  html = html.replace(/src="(assets\/img\/(?:partners|team)\/[^"?]+\.(png|jpe?g))"/gi, (match, rel, ext) => {
+    const file = path.join(SRC, rel);
+    if (!fs.existsSync(file)) return match;
+    const data = fs.readFileSync(file).toString('base64');
+    const mime = ext.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+    return 'src="data:' + mime + ';base64,' + data + '"';
   });
 
   const withoutComments = html.replace(/<!--[\s\S]*?-->/g, '');
