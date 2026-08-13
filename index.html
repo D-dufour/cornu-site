@@ -194,7 +194,7 @@
         <div class="sim-meta" aria-label="Simulation capabilities">
           <span>06 scenarios</span><span>13 sensors</span><span>Real-time fusion</span>
         </div>
-        <button class="btn btn-p" id="openSimulation" type="button">Launch simulation <span class="ar">→</span></button>
+        <a class="btn btn-p" href="simulation/index.html" target="_blank" rel="noopener">Launch simulation <span class="ar">↗</span></a>
         <p class="sim-note mono">Interactive desktop experience</p>
       </div>
       <div class="sim-preview" aria-hidden="true">
@@ -311,7 +311,7 @@
 
       <!-- TEAM MEMBER -->
       <article class="member">
-        <div class="mug"><img class="portrait-max" src="assets/img/team/Max Duursma.jpg" alt="Max Duursma"></div>
+        <div class="mug"><img class="portrait-max" src="assets/img/team/Max Duursma.png" alt="Max Duursma"></div>
         <h4>Max Duursma</h4>
         <div class="role">Co-founder &amp; CEO</div>
         <p>Leads Cornu's company strategy, partnerships and business development.</p>
@@ -455,15 +455,6 @@
   </div>
 </footer>
 </main>
-
-<div class="sim-modal" id="simulationModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="simulationTitle">
-  <div class="sim-modal-bar">
-    <div><span class="sim-modal-mark"></span><strong id="simulationTitle">CORNU</strong><span>Maritime spatial intelligence</span></div>
-    <button type="button" id="closeSimulation" aria-label="Close simulation"><span>Close</span> ✕</button>
-  </div>
-  <iframe id="simulationFrame" title="Cornu maritime spatial intelligence simulation" data-src="simulation/index.html" allow="fullscreen"></iframe>
-</div>
-
 
 <script src="assets/js/cornu.js" defer></script>
 </body>

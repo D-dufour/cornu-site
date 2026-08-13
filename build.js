@@ -51,19 +51,14 @@ function inline() {
   return html;
 }
 
-function inlineSimulation() {
-  const sim = path.join(SRC, 'simulation');
-  let html = fs.readFileSync(path.join(sim, 'index.html'), 'utf8');
-  const css = fs.readFileSync(path.join(sim, 'assets/css/cornu.css'), 'utf8');
-  const scripts = [];
-  html = html.replace(/<link rel="stylesheet" href="assets\/css\/cornu\.css">/,
-    () => '<style>\n' + css + '\n</style>');
-  html = html.replace(/<script src="(assets\/js\/[^"]+)"><\/script>/g, (match, rel) => {
-    scripts.push(fs.readFileSync(path.join(sim, rel), 'utf8'));
-    return '';
-  });
-  if (!scripts.length) throw new Error('Could not find the simulation scripts.');
-  return html.replace('</body>', () => '<script>\n' + scripts.join('\n') + '\n</script>\n</body>');
+function copyTree(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const from = path.join(src, entry.name);
+    const to = path.join(dest, entry.name);
+    if (entry.isDirectory()) copyTree(from, to);
+    else fs.copyFileSync(from, to);
+  }
 }
 
 function bundleDocument(html, label) {
@@ -228,10 +223,8 @@ function gate(p) {
 
 /* ---------- run ---------- */
 const bundle = bundleDocument(inline(), 'site');
-const simulationBundle = bundleDocument(inlineSimulation(), 'simulation');
 
 const payload = encrypt(bundle, PASSWORD);
-const simulationPayload = encrypt(simulationBundle, PASSWORD);
 fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(path.join(OUT, 'index.html'), gate(payload));
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
@@ -239,11 +232,11 @@ fs.writeFileSync(path.join(OUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
 const simulationOut = path.join(OUT, 'simulation');
 fs.rmSync(simulationOut, { recursive: true, force: true });
 fs.mkdirSync(simulationOut, { recursive: true });
-fs.writeFileSync(path.join(simulationOut, 'index.html'), gate(simulationPayload));
+fs.copyFileSync(path.join(SRC, 'simulation', 'index.html'), path.join(simulationOut, 'index.html'));
+copyTree(path.join(SRC, 'simulation', 'assets'), path.join(simulationOut, 'assets'));
 
 const kb = n => (n / 1024).toFixed(1) + ' KB';
 console.log('site      ' + kb(Buffer.byteLength(bundle)));
 console.log('encrypted ' + kb(fs.statSync(path.join(OUT, 'index.html')).size));
 console.log('password  ' + PASSWORD);
-console.log('simulation ' + kb(Buffer.byteLength(simulationBundle)));
-console.log('\nwrote encrypted docs/index.html and docs/simulation/index.html — commit docs/, never source/.');
+console.log('\nwrote encrypted docs/index.html and standalone docs/simulation/ — commit docs/, never source/.');

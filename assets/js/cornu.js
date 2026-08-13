@@ -599,28 +599,6 @@ function frame(){
   if(readout.textContent!==railSecs[act].dataset.rail) readout.textContent=railSecs[act].dataset.rail;
 }
 /* ============================================================
-   Live simulation
-   ============================================================ */
-const simModal=$('#simulationModal'), simFrame=$('#simulationFrame');
-const openSim=$('#openSimulation'), closeSim=$('#closeSimulation');
-let simFocus=null;
-function showSimulation(){
-  if(!simModal||!simFrame) return;
-  simFocus=document.activeElement;
-  if(!simFrame.src) simFrame.src=simFrame.dataset.src;
-  simModal.classList.add('open'); simModal.setAttribute('aria-hidden','false');
-  document.body.classList.add('sim-open'); closeSim.focus();
-}
-function hideSimulation(){
-  if(!simModal) return;
-  simModal.classList.remove('open'); simModal.setAttribute('aria-hidden','true');
-  document.body.classList.remove('sim-open'); if(simFocus) simFocus.focus();
-}
-if(openSim) openSim.addEventListener('click',showSimulation);
-if(closeSim) closeSim.addEventListener('click',hideSimulation);
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&simModal&&simModal.classList.contains('open'))hideSimulation();});
-
-/* ============================================================
    Contact — compose a pre-filled message
    ============================================================ */
 (function(){
