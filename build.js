@@ -51,6 +51,30 @@ function inline() {
   return html;
 }
 
+function inlineSimulation() {
+  const sim = path.join(SRC, 'simulation');
+  let html = fs.readFileSync(path.join(sim, 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(sim, 'assets/css/cornu.css'), 'utf8');
+  const scripts = [];
+  html = html.replace(/<link rel="stylesheet" href="assets\/css\/cornu\.css">/,
+    () => '<style>\n' + css + '\n</style>');
+  html = html.replace(/<script src="(assets\/js\/[^"]+)"><\/script>/g, (match, rel) => {
+    scripts.push(fs.readFileSync(path.join(sim, rel), 'utf8'));
+    return '';
+  });
+  if (!scripts.length) throw new Error('Could not find the simulation scripts.');
+  return html.replace('</body>', () => '<script>\n' + scripts.join('\n') + '\n</script>\n</body>');
+}
+
+function bundleDocument(html, label) {
+  const m = html.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/i);
+  if (!m) throw new Error('Could not find the ' + label + ' script — check the inline step.');
+  try { new Function(m[1]); } catch (e) {
+    throw new Error('The ' + label + ' script does not compile after inlining: ' + e.message);
+  }
+  return JSON.stringify({ h: html.replace(m[0], () => '</body>'), j: m[1] });
+}
+
 /* ---------- 2. encrypt ---------- */
 function encrypt(plaintext, password) {
   const salt = crypto.randomBytes(16);
@@ -203,26 +227,23 @@ function gate(p) {
 }
 
 /* ---------- run ---------- */
-const html = inline();
-
-/* separate the site's inline script from its markup, so the gate can write the
-   markup and then evaluate the script exactly once */
-const m = html.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/i);
-if (!m) throw new Error('Could not find the site script — check the inline step.');
-const bundle = JSON.stringify({ h: html.replace(m[0], () => '</body>'), j: m[1] });
-
-try { new Function(m[1]); } catch (e) {
-  throw new Error('The site script does not compile after inlining: ' + e.message);
-}
+const bundle = bundleDocument(inline(), 'site');
+const simulationBundle = bundleDocument(inlineSimulation(), 'simulation');
 
 const payload = encrypt(bundle, PASSWORD);
+const simulationPayload = encrypt(simulationBundle, PASSWORD);
 fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(path.join(OUT, 'index.html'), gate(payload));
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
 fs.writeFileSync(path.join(OUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
+const simulationOut = path.join(OUT, 'simulation');
+fs.rmSync(simulationOut, { recursive: true, force: true });
+fs.mkdirSync(simulationOut, { recursive: true });
+fs.writeFileSync(path.join(simulationOut, 'index.html'), gate(simulationPayload));
 
 const kb = n => (n / 1024).toFixed(1) + ' KB';
 console.log('site      ' + kb(Buffer.byteLength(bundle)));
 console.log('encrypted ' + kb(fs.statSync(path.join(OUT, 'index.html')).size));
 console.log('password  ' + PASSWORD);
-console.log('\nwrote docs/index.html — commit docs/, never source/.');
+console.log('simulation ' + kb(Buffer.byteLength(simulationBundle)));
+console.log('\nwrote encrypted docs/index.html and docs/simulation/index.html — commit docs/, never source/.');

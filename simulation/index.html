@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CORNU — Maritime Spatial Intelligence System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/cornu.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23050706'/%3E%3Cg fill='none' stroke='%23C9F26E' stroke-width='4' stroke-linecap='round'%3E%3Cpath d='M32 56V30'/%3E%3Cpath d='M32 34 18 22'/%3E%3Cpath d='M32 34 46 22'/%3E%3Cpath d='M18 22 12 10'/%3E%3Cpath d='M18 22 24 12'/%3E%3Cpath d='M46 22 52 10'/%3E%3Cpath d='M46 22 40 12'/%3E%3C/g%3E%3C/svg%3E">
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 64 64" fill="none" stroke="#C9F26E" stroke-width="5" stroke-linecap="round">
+        <path d="M32 60V32"/><path d="M32 34 16 20"/><path d="M32 34 48 20"/>
+        <path d="M16 20 8 7"/><path d="M16 20 23 6"/><path d="M48 20 56 7"/><path d="M48 20 41 6"/>
+      </svg>
+      <b>CORNU</b>
+      <span class="tag">Maritime spatial intelligence</span>
+    </div>
+
+    <div class="hdr-mid">
+      <div class="seg" id="scenarios">
+        <button data-v="normal" class="on">Normal</button>
+        <button data-v="bridge">Bridge</button>
+        <button data-v="collision">Collision</button>
+        <button data-v="obstacle">Obstacle</button>
+        <button data-v="sensorfail">Sensor fail</button>
+        <button data-v="occlusion">Occlusion</button>
+      </div>
+      <div class="seg" id="density">
+        <button data-v="clean" class="on">Clean</button>
+        <button data-v="dense">Engineering</button>
+      </div>
+      <div class="seg" id="viewModes">
+        <button data-v="model">World model</button>
+        <button data-v="blend" class="on">Blended</button>
+        <button data-v="truth">Ground truth</button>
+      </div>
+    </div>
+
+    <div class="hdr-right">
+      <span id="riskBadge">RISK NONE</span>
+      <span id="clock">00:00</span>
+    </div>
+  </header>
+
+  <aside class="left">
+    <div class="block">
+      <h3>Own vessel</h3>
+      <div class="rows" id="vesselRows"></div>
+    </div>
+    <div class="block">
+      <h3>Navigation</h3>
+      <div class="rows" id="navRows"></div>
+    </div>
+    <div class="block">
+      <h3>Performance</h3>
+      <div class="rows" id="perfRows"></div>
+    </div>
+  </aside>
+
+  <main>
+    <canvas id="scene"></canvas>
+
+    <div class="overlay-tl">
+      <div class="mode">World model · active</div>
+    </div>
+
+    <div class="overlay-bl legend">
+      <div><i style="background:#C9F26E"></i>navigable corridor</div>
+      <div><i style="background:#F5F6F2"></i>own swept volume</div>
+      <div><i style="background:#E3C55C"></i>predicted / coasting</div>
+      <div><i style="background:#E0705F"></i>conflict</div>
+    </div>
+
+    <div id="inspector">
+      <div class="insp-head">
+        <span id="inspTitle">—</span>
+        <button id="inspectorClose" aria-label="Close">✕</button>
+      </div>
+      <div class="insp-body">
+        <div class="rows" id="inspRows"></div>
+        <div id="inspSources"></div>
+      </div>
+    </div>
+
+    <div id="bootError"></div>
+  </main>
+
+  <aside class="right">
+    <div class="block">
+      <h3>Perception</h3>
+      <div class="rows" id="perceptRows"></div>
+    </div>
+    <div class="block">
+      <h3>Camera</h3>
+      <div class="seg" id="camModes" style="flex-wrap:wrap">
+        <button data-v="chase" class="on">Chase</button>
+        <button data-v="bird">Bird</button>
+        <button data-v="bow">Bow</button>
+        <button data-v="free">Free</button>
+      </div>
+    </div>
+    <div class="block">
+      <h3>Layers</h3>
+      <div id="layers"></div>
+    </div>
+    <div class="block">
+      <h3>Sensors</h3>
+      <div id="sensorRows"></div>
+    </div>
+  </aside>
+
+  <footer>
+    <div id="alerts"></div>
+    <div class="controls">
+      <div class="seg" id="speeds">
+        <button data-v="0.25">0.25×</button>
+        <button data-v="0.5">0.5×</button>
+        <button data-v="1" class="on">1×</button>
+        <button data-v="2">2×</button>
+        <button data-v="4">4×</button>
+      </div>
+      <button id="playPause" class="on">Pause</button>
+      <button id="reset">Reset</button>
+    </div>
+  </footer>
+
+</div>
+
+<script src="assets/js/00-config.js"></script>
+<script src="assets/js/01-math.js"></script>
+<script src="assets/js/10-world.js"></script>
+<script src="assets/js/20-sensors.js"></script>
+<script src="assets/js/30-tracking.js"></script>
+<script src="assets/js/40-worldmodel.js"></script>
+<script src="assets/js/50-renderer.js"></script>
+<script src="assets/js/60-ui.js"></script>
+<script src="assets/js/70-main.js"></script>
+</body>
+</html>

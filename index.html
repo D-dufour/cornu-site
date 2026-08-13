@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cornu — Intelligence for the physical world</title>
+<meta name="description" content="Cornu builds world models that help autonomous systems perceive, understand and navigate the environments around them. Starting with inland maritime.">
+<meta name="theme-color" content="#050706">
+<meta property="og:title" content="Cornu — Intelligence for the physical world">
+<meta property="og:description" content="World models for autonomous systems. Beginning with inland maritime perception and navigation.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
+<link rel="stylesheet" href="assets/css/cornu.css">
+</head>
+<body class="is-loading">
+
+<!-- ===================== LOADER ===================== -->
+<div id="loader" aria-hidden="true">
+  <div>
+    <svg class="mk" viewBox="0 0 64 64" fill="none">
+      <path d="M32 60V32"/>
+      <path d="M32 34 16 20"/><path d="M32 34 48 20"/>
+      <path d="M16 20 8 7"/><path d="M16 20 23 6"/>
+      <path d="M48 20 56 7"/><path d="M48 20 41 6"/>
+    </svg>
+    <div class="lb mono">Cornu</div>
+  </div>
+</div>
+
+<!-- ===================== NAV ===================== -->
+<header class="nav" id="nav">
+  <a class="brand" href="#top" aria-label="Cornu — home">
+    <svg viewBox="0 0 64 64" fill="none" stroke="#C9F26E" stroke-width="5" stroke-linecap="round" aria-hidden="true">
+      <path d="M32 60V32"/><path d="M32 34 16 20"/><path d="M32 34 48 20"/>
+      <path d="M16 20 8 7"/><path d="M16 20 23 6"/><path d="M48 20 56 7"/><path d="M48 20 41 6"/>
+    </svg>
+    <span class="wm">CORNU</span>
+  </a>
+  <nav class="nav-links" id="navLinks">
+    <a href="#technology">Technology</a>
+    <a href="#maritime">Maritime</a>
+    <a href="#worldmodel">World model</a>
+    <a href="#simulation">Simulation</a>
+    <a href="#company">Company</a>
+    <a href="#careers">Careers</a>
+  </nav>
+  <a class="nav-cta" href="#contact">Contact</a>
+  <button class="burger" id="burger" aria-label="Menu" aria-expanded="false"><span></span><span></span><span></span></button>
+</header>
+
+<!-- telemetry rail -->
+<div class="rail" id="rail" aria-hidden="true"></div>
+
+<main id="top">
+
+<!-- ===================== 1 — HERO ===================== -->
+<section class="hero" data-rail="Origin">
+  <canvas id="heroCanvas"></canvas>
+  <div class="hero-in wrap">
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow rv in"><span class="bar"></span><span class="mono">Cornu — Physical world intelligence</span></div>
+        <h1 class="t-hero rv in rv-d1">Intelligence for the physical world.</h1>
+      </div>
+      <p class="lede rv in rv-d2">Cornu builds world models that help autonomous systems perceive, understand and navigate the environments around them.</p>
+    </div>
+    <div class="cta-row rv in rv-d3">
+      <a class="btn btn-p" href="#problem">Explore Cornu <span class="ar">→</span></a>
+      <a class="btn btn-s" href="#technology">Our technology <span class="ar">→</span></a>
+    </div>
+  </div>
+  <div class="scroll-hint"><span class="mono">Scroll</span><i></i></div>
+</section>
+
+<!-- ===================== 2 — THE PROBLEM ===================== -->
+<section class="track prob" id="problem" data-rail="The problem" style="height:420vh">
+  <div class="stage">
+    <div class="wrap" style="width:100%">
+      <div class="prob-lines">
+        <h2 class="t-xl ln" data-i="0">Autonomous systems cannot navigate a world they don't understand.</h2>
+        <h2 class="t-xl ln" data-i="1">Seeing is <em>not enough</em>.</h2>
+        <h2 class="t-xl ln" data-i="2">They need context.</h2>
+        <h2 class="t-xl ln" data-i="3">They need memory.</h2>
+        <h2 class="t-xl ln" data-i="4">They need a <em>world model</em>.</h2>
+      </div>
+    </div>
+    <canvas class="prob-mark" id="probCanvas" width="800" height="800"></canvas>
+  </div>
+</section>
+
+<!-- ===================== 3 — WHAT CORNU BUILDS ===================== -->
+<section class="pane" id="technology" data-rail="What we build">
+  <div class="wrap">
+    <div class="eyebrow rv"><span class="bar"></span><span class="mono">01 — The system</span></div>
+    <h2 class="t-xl rv rv-d1" style="max-width:17ch">A continuously evolving understanding of the world.</h2>
+    <p class="lede rv rv-d2" style="margin-top:clamp(22px,2.6vw,34px)">Sensors observe. Edge compute interprets. External data adds what sensors cannot see. History adds what the moment cannot show. Cornu resolves all of it into one representation a machine can act on.</p>
+
+    <div class="pipe">
+      <div>
+        <div class="mono" style="margin-bottom:14px">Inputs</div>
+        <div class="pipe-row" id="inputChips">
+          <span class="chip">Camera</span><span class="chip">Radar</span><span class="chip">AIS</span>
+          <span class="chip">Position</span><span class="chip">Telemetry</span><span class="chip">Environment</span>
+          <span class="chip">Charts &amp; notices</span><span class="chip">Prior observations</span>
+        </div>
+      </div>
+      <div>
+        <div class="mono" style="margin-bottom:14px">Constraint</div>
+        <p class="body-s">No single sensor describes a waterway. A camera loses the channel at night, radar cannot read a bridge sign, AIS only reports vessels that transmit. Fusion is not a feature of the product — it is the product.</p>
+      </div>
+    </div>
+
+    <div class="stack-flow" style="margin-top:clamp(48px,6vw,88px)">
+      <div class="flow-step"><div class="n">→ 01</div><div><h3>Perception</h3><p class="d">Detection, segmentation and tracking across fused sensor streams. Vessels, infrastructure, markers, debris, shoreline.</p></div></div>
+      <div class="flow-step"><div class="n">→ 02</div><div><h3>Spatial understanding</h3><p class="d">Observations become geometry: positions, distances, clearances, channel boundaries and navigable space in a consistent frame.</p></div></div>
+      <div class="flow-step"><div class="n">→ 03</div><div><h3>World model</h3><p class="d">Geometry becomes a persistent representation — what is here, what changed since the last passage, what conditions apply now.</p></div></div>
+      <div class="flow-step"><div class="n">→ 04</div><div><h3>Intelligence</h3><p class="d">Prediction and reasoning over that representation: trajectories, conflicts, lock and bridge timing, route risk.</p></div></div>
+      <div class="flow-step"><div class="n">→ 05</div><div><h3>Autonomy</h3><p class="d">The same layer that informs a crew can inform a control system. Assistance first, automation as it is earned.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<hr class="rule">
+
+<!-- ===================== 4 — STARTING WITH WATER ===================== -->
+<section class="track water" id="maritime" data-rail="Maritime" style="height:340vh">
+  <div class="stage">
+    <canvas id="waterCanvas"></canvas>
+    <div class="water-copy wrap">
+      <div class="eyebrow"><span class="bar"></span><span class="mono">02 — First deployment</span></div>
+      <h2 class="t-xl" style="max-width:12ch">We start on the water.</h2>
+      <p class="lede" style="margin-top:clamp(20px,2.4vw,30px)">Cornu's first platform gives inland vessels a continuously updated understanding of the environment around them — bridges, locks, traffic, channel and shoreline, in daylight and at night.</p>
+      <div class="water-legend">
+        <span><i></i>Infrastructure</span><span><i></i>Vessel track</span><span><i></i>Navigable corridor</span><span><i></i>Clearance</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 5 — NETWORK EFFECT ===================== -->
+<section class="track net" data-rail="The network" style="height:460vh">
+  <div class="stage">
+    <canvas id="netCanvas"></canvas>
+    <div class="net-copy wrap" style="width:100%">
+      <div class="eyebrow"><span class="bar"></span><span class="mono">03 — Compounding</span></div>
+      <h2 class="t-xl" id="netHead" style="max-width:14ch">One vessel sees a waterway.</h2>
+      <p class="net-count" id="netCount" style="margin-top:26px">VESSELS ONLINE · 001</p>
+    </div>
+  </div>
+</section>
+
+<section class="pane" style="padding-top:0">
+  <div class="wrap">
+    <p class="lede rv" style="max-width:52ch">Every Cornu deployment can improve the intelligence available to the wider network. A bridge is not observed once. Over a year of traffic it is observed thousands of times, in every light and water level.</p>
+    <div class="wheel rv rv-d1">
+      <div><span class="k">01</span><span class="v">More vessels</span></div>
+      <div><span class="k">02</span><span class="v">More observations</span></div>
+      <div><span class="k">03</span><span class="v">Better world model</span></div>
+      <div><span class="k">04</span><span class="v">Better models</span></div>
+      <div><span class="k">05</span><span class="v">Better product</span></div>
+      <div><span class="k">06 ↻</span><span class="v">More vessels</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 6 — THE WORLD MODEL ===================== -->
+<section class="track wm-sec" id="worldmodel" data-rail="World model" style="height:400vh">
+  <div class="stage">
+    <canvas id="wmCanvas"></canvas>
+    <div class="wm-copy wrap">
+      <div class="eyebrow"><span class="bar"></span><span class="mono">04 — Representation</span></div>
+      <h2 class="t-lg">The world doesn't stand still.<br>Neither should the map.</h2>
+      <p class="lede" style="margin-top:24px">A chart describes where things were. Cornu is built to describe what exists now, how it has changed, and what is likely to happen next.</p>
+      <div class="wm-meter">
+        <span class="mono" id="wmLabel">Passage 001</span>
+        <span class="bar"><i id="wmBar"></i></span>
+        <span class="mono mono-sig" id="wmObs">0 obs</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== LIVE SIMULATION ===================== -->
+<section class="pane sim-sec" id="simulation" data-rail="Live simulation">
+  <div class="wrap">
+    <div class="sim-shell rv">
+      <div class="sim-copy">
+        <div class="eyebrow"><span class="bar"></span><span class="mono">05 — Live system</span></div>
+        <h2 class="t-lg">See the world model think.</h2>
+        <p class="lede">Step onto the bridge of a simulated 100-metre inland vessel. Explore how Cornu turns imperfect camera, radar, LiDAR and AIS observations into a persistent model of the waterway.</p>
+        <div class="sim-meta" aria-label="Simulation capabilities">
+          <span>06 scenarios</span><span>13 sensors</span><span>Real-time fusion</span>
+        </div>
+        <button class="btn btn-p" id="openSimulation" type="button">Launch simulation <span class="ar">→</span></button>
+        <p class="sim-note mono">Interactive desktop experience</p>
+      </div>
+      <div class="sim-preview" aria-hidden="true">
+        <div class="sim-preview-top"><span>World model · active</span><span>Risk none</span></div>
+        <div class="sim-water">
+          <i class="sim-channel"></i><i class="sim-vessel sim-vessel-own"></i>
+          <i class="sim-vessel sim-vessel-a"></i><i class="sim-vessel sim-vessel-b"></i>
+          <i class="sim-track sim-track-a"></i><i class="sim-track sim-track-b"></i>
+          <span class="sim-scan scan-a"></span><span class="sim-scan scan-b"></span>
+        </div>
+        <div class="sim-preview-foot"><span>Camera · Radar · LiDAR · AIS</span><span>60 FPS</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 7 — TECHNOLOGY STACK ===================== -->
+<section class="pane">
+  <div class="wrap">
+    <div class="eyebrow rv"><span class="bar"></span><span class="mono">06 — Architecture</span></div>
+    <h2 class="t-lg rv rv-d1" style="max-width:16ch">One stack, from sensor to decision.</h2>
+    <div class="layers rv rv-d2" style="margin-top:clamp(38px,4.5vw,64px)">
+      <div class="layer" tabindex="0">
+        <h3>Physical</h3>
+        <div class="tags"><span>Cameras</span><span>Radar</span><span>Positioning</span><span>Telemetry</span><span>Environmental sensing</span></div>
+        <div class="more"><p>Marine-grade enclosures and an onboard compute unit sized for continuous operation. Installed per vessel, calibrated per hull.</p></div>
+      </div>
+      <div class="layer" tabindex="0">
+        <h3>Perception</h3>
+        <div class="tags"><span>Object understanding</span><span>Geometry</span><span>Motion</span><span>Sensor fusion</span></div>
+        <div class="more"><p>Models trained on inland waterway conditions rather than road scenes — reflection, glare, fog, night operation, low-contrast water surfaces.</p></div>
+      </div>
+      <div class="layer" tabindex="0">
+        <h3>World model</h3>
+        <div class="tags"><span>Spatial intelligence</span><span>Historical context</span><span>Environment representation</span><span>Prediction</span></div>
+        <div class="more"><p>A shared representation that persists between passages and between vessels, updated as observations arrive and reconciled against charts, water levels and notices.</p></div>
+      </div>
+      <div class="layer" tabindex="0">
+        <h3>Intelligence</h3>
+        <div class="tags"><span>Navigation</span><span>Safety</span><span>Fleet intelligence</span><span>Autonomy</span></div>
+        <div class="more"><p>Warnings, clearance and timing support, route intelligence and fleet-level analytics — delivered onboard and to shore.</p></div>
+      </div>
+      <div class="layer" tabindex="0">
+        <h3>Applications</h3>
+        <div class="tags"><span>Maritime</span><span>Robotics</span><span>Mobility</span><span>Infrastructure</span><span>Physical AI</span></div>
+        <div class="more"><p>Maritime products sit on top of a general architecture. Other domains reuse the layers beneath rather than starting again.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== 8 — MARITIME TO PHYSICAL AI ===================== -->
+<section class="pane dom" id="direction">
+  <div class="wrap">
+    <div class="eyebrow rv"><span class="bar"></span><span class="mono">07 — Direction</span></div>
+    <h2 class="t-xl rv rv-d1" style="max-width:15ch">One intelligence architecture. Many physical systems.</h2>
+    <p class="lede rv rv-d2" style="margin-top:clamp(20px,2.4vw,30px)">Waterways are the beginning. The problem underneath is the same everywhere: a machine has to build and keep an accurate understanding of the space it operates in.</p>
+    <div class="dom-grid rv rv-d3">
+      <div class="dom-cell"><div><h4>Inland vessels</h4><p>Perception, navigation intelligence and pilot deployments with commercial operators.</p></div><span class="tag now">In deployment</span></div>
+      <div class="dom-cell"><div><h4>Ports &amp; infrastructure</h4><p>Fixed observation points and change detection along quays, locks and bridges.</p></div><span class="tag">Development</span></div>
+      <div class="dom-cell"><div><h4>Industrial robotics</h4><p>The same spatial layer applied to machines operating in structured industrial space.</p></div><span class="tag">Research direction</span></div>
+      <div class="dom-cell"><div><h4>Mobility</h4><p>Shared world-model infrastructure for vehicles and autonomous platforms.</p></div><span class="tag">Research direction</span></div>
+      <div class="dom-cell"><div><h4>Wearable perception</h4><p>Consent-based human observation networks contributing to compatible representations.</p></div><span class="tag">Research direction</span></div>
+    </div>
+    <p class="body-s rv rv-d4" style="margin-top:26px;color:var(--muted-2)">Labels are literal. Only work marked <span style="color:var(--signal)">in deployment</span> is available to customers today.</p>
+  </div>
+</section>
+
+<!-- ===================== 9 — VISION ===================== -->
+<section class="track vision" data-rail="Vision" style="height:420vh">
+  <div class="stage">
+    <div class="wrap" style="width:100%">
+      <div class="vis-lines">
+        <h2 class="t-xl ln" data-i="0">A world understood<br>by machines.</h2>
+        <h2 class="t-xl ln" data-i="1">Continuously observed.</h2>
+        <h2 class="t-xl ln" data-i="2">Continuously modelled.</h2>
+        <h2 class="t-xl ln" data-i="3">Continuously understood.</h2>
+        <div class="ln vis-mark" data-i="4">
+          <svg viewBox="0 0 64 64" fill="none" stroke="#C9F26E" stroke-width="4" stroke-linecap="round" aria-hidden="true">
+            <path d="M32 60V32"/><path d="M32 34 16 20"/><path d="M32 34 48 20"/>
+            <path d="M16 20 8 7"/><path d="M16 20 23 6"/><path d="M48 20 56 7"/><path d="M48 20 41 6"/>
+          </svg>
+          <span class="wm2">CORNU</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ===================== 10 — COMPANY & TEAM ===================== -->
+<!-- EDIT ME: replace the facts, the team members and the open roles below.
+     Each .member block is one person — duplicate or delete as needed.
+     To use a portrait, put the image in assets/img/team/ and swap the
+     <span> monogram for: <img src="assets/img/team/name.jpg" alt="Name Surname"> -->
+<section class="pane company" id="company" data-rail="Company">
+  <div class="wrap">
+    <div class="eyebrow rv"><span class="bar"></span><span class="mono">08 — Company</span></div>
+    <h2 class="t-xl rv rv-d1" style="max-width:16ch">A small team, close to the water.</h2>
+    <p class="lede rv rv-d2" style="margin-top:clamp(20px,2.4vw,30px)">Based in Groningen, the Netherlands, Cornu is built by a founding team working across technology, business and marketing. We test on working vessels, in the conditions the system has to survive.</p>
+
+    <div class="facts rv rv-d3">
+      <div><span class="k">Founded</span><span class="v">2026</span></div>
+      <div><span class="k">Based</span><span class="v">Groningen, NL</span></div>
+      <div><span class="k">Team</span><span class="v">4 people</span></div>
+      <div><span class="k">Focus</span><span class="v">Inland maritime</span></div>
+    </div>
+
+    <div class="sec-head rv" style="margin-top:clamp(56px,7vw,96px)">
+      <span class="mono">The team</span>
+      <span class="mono">04 members</span>
+    </div>
+    <div class="team rv rv-d1">
+
+      <!-- TEAM MEMBER -->
+      <article class="member">
+        <div class="mug"><img class="portrait-max" src="assets/img/team/Max Duursma.jpg" alt="Max Duursma"></div>
+        <h4>Max Duursma</h4>
+        <div class="role">Co-founder &amp; CEO</div>
+        <p>Leads Cornu's company strategy, partnerships and business development.</p>
+      </article>
+
+      <article class="member">
+        <div class="mug"><img class="portrait-damien" src="assets/img/team/Damien Dufour (3).png" alt="Damien Dufour"></div>
+        <h4>Damien Dufour</h4>
+        <div class="role">Co-founder &amp; CTO</div>
+        <p>Leads Cornu's technology, engineering and product architecture.</p>
+      </article>
+
+      <article class="member">
+        <div class="mug"><img class="portrait-roeland" src="assets/img/team/Roeland Duursma.png" alt="Roeland Duursma"></div>
+        <h4>Roeland Duursma</h4>
+        <div class="role">Co-founder &amp; Marketing Director</div>
+        <p>Leads Cornu's marketing, communications and brand development.</p>
+      </article>
+
+      <article class="member">
+        <div class="mug"><img class="portrait-gerard" src="assets/img/team/Gerard Mampaey.jpg" alt="Gerard Mampaey"></div>
+        <h4>Gerard Mampaey</h4>
+        <div class="role">Co-founder &amp; Investor</div>
+        <p>Supports Cornu's growth as an investor and strategic co-founder.</p>
+      </article>
+
+    </div>
+
+    <!-- COLLABORATION PARTNERS
+         Replace each placeholder with a partner name. To use a logo, put the
+         image in assets/img/partners/ and replace the .partner-mark span with:
+         <img src="assets/img/partners/partner-logo.svg" alt="Partner name logo"> -->
+    <div class="partners rv" aria-labelledby="partners-heading">
+      <div class="partners-intro">
+        <span class="mono">Collaboration partners</span>
+        <h3 id="partners-heading">Building the future together.</h3>
+      </div>
+      <div class="partner-list">
+        <div class="partner"><img src="assets/img/partners/ruglogo.png" alt="University of Groningen logo"><span>University of Groningen</span></div>
+        <div class="partner"><img src="assets/img/partners/AMS.png" alt="AutoMooring Solutions logo"><span>AutoMooring Solutions</span></div>
+      </div>
+    </div>
+
+    <div class="sec-head rv" id="careers" style="margin-top:clamp(56px,7vw,96px)">
+      <span class="mono">Open roles</span>
+      <span class="mono">Groningen · on site</span>
+    </div>
+    <div class="roles rv rv-d1">
+      <a class="role-row" href="mailto:careers@cornu.ai?subject=Senior%20Perception%20Engineer">
+        <span class="t">Senior Perception Engineer</span><span class="m">Perception</span><span class="ar">→</span></a>
+      <a class="role-row" href="mailto:careers@cornu.ai?subject=Embedded%20Systems%20Engineer">
+        <span class="t">Embedded Systems Engineer</span><span class="m">Hardware</span><span class="ar">→</span></a>
+      <a class="role-row" href="mailto:careers@cornu.ai?subject=Geospatial%20Engineer">
+        <span class="t">Geospatial / SLAM Engineer</span><span class="m">World model</span><span class="ar">→</span></a>
+      <a class="role-row" href="mailto:careers@cornu.ai?subject=Field%20Deployment%20Engineer">
+        <span class="t">Field Deployment Engineer</span><span class="m">Operations</span><span class="ar">→</span></a>
+    </div>
+    <p class="body-s rv rv-d2" style="margin-top:22px">Nothing that fits? If you have worked on perception, marine hardware or spatial systems, write to <a href="mailto:careers@cornu.ai" class="ul">careers@cornu.ai</a>.</p>
+  </div>
+</section>
+
+<!-- ===================== 11 — CONTACT ===================== -->
+<section class="pane cta-sec" id="contact" data-rail="Contact">
+  <div class="wrap">
+    <div class="eyebrow rv"><span class="bar"></span><span class="mono">09 — Work with us</span></div>
+    <div class="contact-grid">
+      <div>
+        <h2 class="t-xl rv rv-d1" style="max-width:11ch">Start with your fleet.</h2>
+        <p class="lede rv rv-d2" style="margin-top:clamp(20px,2.4vw,30px)">Talk to Cornu about maritime perception, navigation intelligence and pilot deployments. A pilot starts with one vessel and a route you already run.</p>
+        <div class="paths rv rv-d3">
+          <button type="button" class="path" data-interest="Vessel operator"><span>Vessel operators</span><span class="ar">→</span></button>
+          <button type="button" class="path" data-interest="Shipyard"><span>Shipyards</span><span class="ar">→</span></button>
+          <button type="button" class="path" data-interest="Technology partner"><span>Technology partners</span><span class="ar">→</span></button>
+          <button type="button" class="path" data-interest="Research partner"><span>Research partners</span><span class="ar">→</span></button>
+          <button type="button" class="path" data-interest="Investor"><span>Investors</span><span class="ar">→</span></button>
+        </div>
+      </div>
+
+      <div class="form rv rv-d2" id="contactForm">
+        <div class="field full">
+          <label for="f-name">Name</label>
+          <input id="f-name" type="text" autocomplete="name" placeholder="Your name">
+        </div>
+        <div class="field">
+          <label for="f-org">Organisation</label>
+          <input id="f-org" type="text" autocomplete="organization" placeholder="Company or vessel">
+        </div>
+        <div class="field">
+          <label for="f-email">Email</label>
+          <input id="f-email" type="email" autocomplete="email" placeholder="you@company.com">
+        </div>
+        <div class="field">
+          <label for="f-interest">I am a</label>
+          <select id="f-interest">
+            <option>Vessel operator</option>
+            <option>Shipyard</option>
+            <option>Technology partner</option>
+            <option>Research partner</option>
+            <option>Investor</option>
+            <option>Something else</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-fleet">Vessels in fleet</label>
+          <input id="f-fleet" type="text" inputmode="numeric" placeholder="Optional">
+        </div>
+        <div class="field full">
+          <label for="f-msg">What would you like to do?</label>
+          <textarea id="f-msg" rows="4" placeholder="Routes you run, what you would want the system to tell you, and when you would want to start."></textarea>
+        </div>
+        <div class="field full form-actions">
+          <button type="button" class="btn btn-p" id="sendBtn">Talk to Cornu <span class="ar">→</span></button>
+          <p class="form-note" id="formStatus">This opens a pre-filled message in your mail app. Nothing is sent from this page.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FOOTER ===================== -->
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <a class="brand" href="#top" style="margin-bottom:18px">
+          <svg viewBox="0 0 64 64" fill="none" stroke="#C9F26E" stroke-width="5" stroke-linecap="round" aria-hidden="true">
+            <path d="M32 60V32"/><path d="M32 34 16 20"/><path d="M32 34 48 20"/>
+            <path d="M16 20 8 7"/><path d="M16 20 23 6"/><path d="M48 20 56 7"/><path d="M48 20 41 6"/>
+          </svg><span class="wm">CORNU</span>
+        </a>
+        <p class="body-s" style="max-width:34ch">Intelligence for the physical world. Built in the Netherlands.</p>
+      </div>
+      <div><h5>Company</h5><ul><li><a href="#company">About</a></li><li><a href="#careers">Careers</a></li><li><a href="#contact">Contact</a></li><li><a href="#">Press</a></li></ul></div>
+      <div><h5>Technology</h5><ul><li><a href="#technology">Platform</a></li><li><a href="#worldmodel">World model</a></li><li><a href="#simulation">Simulation</a></li><li><a href="#maritime">Maritime</a></li></ul></div>
+      <div><h5>Legal</h5><ul><li><a href="#">Privacy</a></li><li><a href="#">Data governance</a></li><li><a href="#">Security</a></li><li><a href="#">Terms</a></li></ul></div>
+    </div>
+    <div class="foot-bot">
+      <span class="mono">© 2026 Cornu B.V.</span>
+      <span class="mono">52.1926° N · 4.4269° E</span>
+    </div>
+  </div>
+</footer>
+</main>
+
+<div class="sim-modal" id="simulationModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="simulationTitle">
+  <div class="sim-modal-bar">
+    <div><span class="sim-modal-mark"></span><strong id="simulationTitle">CORNU</strong><span>Maritime spatial intelligence</span></div>
+    <button type="button" id="closeSimulation" aria-label="Close simulation"><span>Close</span> ✕</button>
+  </div>
+  <iframe id="simulationFrame" title="Cornu maritime spatial intelligence simulation" data-src="simulation/index.html" allow="fullscreen"></iframe>
+</div>
+
+
+<script src="assets/js/cornu.js" defer></script>
+</body>
+</html>
