@@ -85,6 +85,9 @@
       this._acc.wm = 0;
       const ego = this.provider.getEgoState(this.simTime);
       this.wm.update(observations, structural, ego, step, this.simTime);
+      /* close the loop: what the model decided is what the helm executes on
+         the next physics step. Perception → model → decision → control. */
+      this.world.ownShip.guidance = this.wm.getGuidance();
       this._counters.wm++;
     }
   };

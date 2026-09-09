@@ -108,6 +108,34 @@
     if (-c.z < this.near) return null;
     return this.toScreen(c);
   };
+  /* Polygon with near-plane clipping (Sutherland–Hodgman against z = near).
+     Large ground and water quads routinely straddle the camera; clipping
+     them is what stops the terrain from flickering out at close range. */
+  Projector.prototype.polyScreen = function (pts) {
+    const n = pts.length;
+    if (n < 3) return null;
+    const cam = new Array(n);
+    for (let i = 0; i < n; i++) cam[i] = this.cam(pts[i]);
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const a = cam[i], b = cam[(i + 1) % n];
+      const da = -a.z - this.near, db = -b.z - this.near;
+      if (da >= 0) out.push(a);
+      if ((da >= 0) !== (db >= 0)) {
+        const t = da / (da - db);
+        out.push({
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t,
+          z: a.z + (b.z - a.z) * t
+        });
+      }
+    }
+    if (out.length < 3) return null;
+    const scr = new Array(out.length);
+    for (let i = 0; i < out.length; i++) scr[i] = this.toScreen(out[i]);
+    return scr;
+  };
+
   /* segment with near-plane clipping */
   Projector.prototype.segment = function (a, b) {
     let ca = this.cam(a), cb = this.cam(b);
@@ -256,6 +284,46 @@
     }
   };
 
+  /* a filled polygon that survives the camera passing through it */
+  Renderer.prototype.fillClipped = function (P, pts, fill, stroke, width) {
+    const scr = P.polyScreen(pts);
+    if (!scr) return false;
+    const g = this.ctx;
+    g.beginPath();
+    g.moveTo(scr[0].x, scr[0].y);
+    for (let i = 1; i < scr.length; i++) g.lineTo(scr[i].x, scr[i].y);
+    g.closePath();
+    if (fill) { g.fillStyle = fill; g.fill(); }
+    if (stroke) { g.strokeStyle = stroke; g.lineWidth = width || 1; g.stroke(); }
+    return true;
+  };
+
+  /* An extruded footprint between two heights — the workhorse for anything
+     built rather than floated: bank walls, sheds, quays, the bridge deck.
+     Faces are painter-sorted within the object and lit from above. */
+  Renderer.prototype.prism = function (P, base, z0, z1, tone, alpha, topShade) {
+    const n = base.length;
+    const lo = base.map((q) => ({ x: q.x, y: q.y, z: z0 }));
+    const hi = base.map((q) => ({ x: q.x, y: q.y, z: z1 }));
+    const faces = [];
+    let cx = 0, cy = 0;
+    for (let i = 0; i < n; i++) {
+      cx += base[i].x; cy += base[i].y;
+      const j = (i + 1) % n;
+      const c = P.cam({
+        x: (lo[i].x + lo[j].x) / 2, y: (lo[i].y + lo[j].y) / 2, z: (z0 + z1) / 2
+      });
+      /* alternate wall tone slightly so adjacent faces separate */
+      faces.push({ pts: [lo[i], lo[j], hi[j], hi[i]], depth: -c.z, k: 0.46 + 0.14 * (i % 2) });
+    }
+    const ct = P.cam({ x: cx / n, y: cy / n, z: z1 });
+    faces.push({ pts: hi, depth: -ct.z - 0.01, k: topShade === undefined ? 0.95 : topShade });
+    faces.sort((a, b) => b.depth - a.depth);
+    for (const fc of faces) {
+      this.fillClipped(P, fc.pts, shade(tone, fc.k, alpha),
+        shade(tone, fc.k * 1.6 + 0.2, alpha * 0.42), 1);
+    }
+  };
   /* smooth ribbon between two edge polylines, with a fade along its length */
   Renderer.prototype.ribbon = function (P, L, R, rgb, a0, a1) {
     const g = this.ctx;
@@ -300,14 +368,26 @@
     const P = new Projector(this.camera, this.W, this.H);
     this.pickables = [];
 
-    g.clearRect(0, 0, this.W, this.H);
-    const bg = g.createLinearGradient(0, 0, 0, this.H);
-    bg.addColorStop(0, '#040605'); bg.addColorStop(0.52, '#080C0A'); bg.addColorStop(1, '#050807');
-    g.fillStyle = bg; g.fillRect(0, 0, this.W, this.H);
-
     const own = wm.getOwnVessel();
     if (!own) return;
     const modelOnly = viewMode === 'model';
+    /* "World model" is the view that renders the model as a place. Blended
+       and Ground truth keep the environment, dimmed, so the annotation
+       layers stay dominant. */
+    const env = this.layers.decor ? (modelOnly ? 1 : 0.6) : 0;
+    this.envLevel = env;
+
+    g.clearRect(0, 0, this.W, this.H);
+    const bg = g.createLinearGradient(0, 0, 0, this.H);
+    if (env > 0) {
+      bg.addColorStop(0, '#05080B'); bg.addColorStop(0.46, '#0A1218');
+      bg.addColorStop(0.72, '#132029'); bg.addColorStop(1, '#0A1116');
+    } else {
+      bg.addColorStop(0, '#040605'); bg.addColorStop(0.52, '#080C0A'); bg.addColorStop(1, '#050807');
+    }
+    g.fillStyle = bg; g.fillRect(0, 0, this.W, this.H);
+
+    if (env > 0 && world) this.drawEnvironment(P, wm, world, env);
 
     this.drawHorizonGrid(P, own, modelOnly);
 
@@ -324,6 +404,7 @@
     this.drawOwnShip(P, own);
     this.drawEntities(P, wm);
     this.drawConflicts(P, wm);
+    this.drawGuidance(P, wm);
     this.drawCompass(own, wm);
   };
 
@@ -728,5 +809,385 @@
       '  ' + (e.classConfidence * 100).toFixed(0) + '%';
   }
 
+  /* =====================================================================
+     ENVIRONMENT
+
+     The annotation layers describe what CORNU knows. This describes where
+     it knows it — the place the vessel is actually moving through. The
+     channel geometry comes from the waterway (the chart the vessel sails
+     with); everything semantic still comes from the world model, so what
+     is drawn here is scenery and what is drawn over it is understanding.
+     ================================================================== */
+  const GROUND = 3.4;    // m — top of the embankment above the waterline
+  const VERGE  = 34;     // m — horizontal run of the bank slope
+  const OUTER  = 1150;   // m — how far the flat land runs beyond the bank
+
+  Renderer.prototype.scenery = function (world) {
+    if (this._scenFor === world && this._scen) return this._scen;
+    const ww = world.waterway;
+    const rng = new NS.math.Rng(0x9E3779B9 ^ CFG.seed);
+    const STEP = 25;
+
+    /* the four rails that define the cross-section, sampled along the run */
+    const rails = [];
+    for (let st = 0; st <= ww.length; st += STEP) {
+      const a = ww.at(st), hw = a.halfWidth;
+      rails.push({
+        s: st, hw,
+        wE: ww.point(st, hw),                    // waterline, east bank
+        wW: ww.point(st, -hw),                   // waterline, west bank
+        tE: ww.point(st, hw + VERGE),            // top of the east embankment
+        tW: ww.point(st, -(hw + VERGE)),
+        oE: ww.point(st, hw + VERGE + OUTER),    // flat land beyond
+        oW: ww.point(st, -(hw + VERGE + OUTER))
+      });
+    }
+
+    /* --- props ---------------------------------------------------------- */
+    const props = [];
+    const at = (st, off) => ww.point(clamp(st, 0, ww.length), off);
+
+    /* tree lines along both banks, thinning out away from the water */
+    for (let st = 6; st < ww.length; st += 12) {
+      for (const side of [1, -1]) {
+        if (rng.next() > 0.62) continue;
+        const a = ww.at(st);
+        const out = VERGE * rng.range(0.5, 1.05) + rng.range(0, 150);
+        props.push({
+          t: 'tree',
+          p: at(st + rng.range(-5, 5), side * (a.halfWidth + out)),
+          h: rng.range(6, 15.5), r: rng.range(2.1, 4.8),
+          conifer: rng.next() < 0.32, k: rng.range(0.62, 1.05)
+        });
+      }
+    }
+
+    /* buildings — a working bank, not a skyline */
+    const build = (st, off, len, beam, h, kind) => {
+      const a = ww.at(clamp(st, 0, ww.length));
+      props.push({ t: 'building', p: at(st, off), heading: a.heading, len, beam, h, kind });
+    };
+    /* warehouses behind the quay */
+    for (let k = 0; k < 4; k++) {
+      build(632 + k * 74, 92 + rng.range(0, 34), rng.range(30, 52), rng.range(17, 26),
+        rng.range(8, 13.5), 'shed');
+    }
+    /* a short terrace on the west bank */
+    for (let k = 0; k < 6; k++) {
+      build(300 + k * 26, -(78 + rng.range(0, 16)), 20, 13, rng.range(7, 10), 'house');
+    }
+    /* industry near the bridge, and a silo pair that reads at range */
+    build(1030, 118, 46, 28, 15, 'shed');
+    build(1210, -126, 40, 24, 12, 'shed');
+    props.push({ t: 'silo', p: at(1052, 92), h: 26, r: 7.5 });
+    props.push({ t: 'silo', p: at(1052, 112), h: 26, r: 7.5 });
+    /* the lock house at the north end */
+    build(1620, 64, 22, 16, 9, 'house');
+
+    /* quay wall along the moorings, at the water edge */
+    const quay = [];
+    for (let st = 630; st <= 910; st += 20) {
+      const a = ww.at(st);
+      quay.push({ inner: ww.point(st, a.halfWidth - 2), outer: ww.point(st, a.halfWidth + 7) });
+    }
+
+    /* lamp standards along the bank road either side of the bridge */
+    const lamps = [];
+    for (let st = 980; st <= 1270; st += 42) {
+      for (const side of [1, -1]) {
+        const a = ww.at(st);
+        lamps.push({ p: at(st, side * (a.halfWidth + VERGE * 0.5)), h: 8.5 });
+      }
+    }
+
+    this._scenFor = world;
+    this._scen = { rails, props, quay, lamps, step: STEP };
+    return this._scen;
+  };
+
+  /* --- one frame of environment ----------------------------------------- */
+  Renderer.prototype.drawEnvironment = function (P, wm, world, env) {
+    const g = this.ctx;
+    const own = wm.getOwnVessel();
+    const sc = this.scenery(world);
+    const rails = sc.rails, n = rails.length;
+    const t = wm.time || 0;
+
+    /* work in station space around the vessel so cost stays constant */
+    const s0 = world.ownShip ? world.ownShip.stationEstimate : 0;
+    const i0 = clamp(Math.floor((s0 - 180) / sc.step), 0, n - 2);
+    const i1 = clamp(Math.ceil((s0 + 1000) / sc.step), 1, n - 1);
+
+    const A = (a) => clamp(a * env, 0, 1).toFixed(3);
+    /* everything fades into the same haze the sky ends on */
+    const hazeOf = (d) => clamp((d - 260) / 780, 0, 0.86);
+
+    /* far to near, so the painter order is the depth order */
+    for (let i = i1 - 1; i >= i0; i--) {
+      const stride = (rails[i].s - s0) > 420 ? 2 : 1;
+      const j = Math.min(n - 1, i + stride);
+      if (j === i) continue;
+      const a = rails[i], b = rails[j];
+      const mid = { x: (a.wE.x + b.wW.x) / 2, y: (a.wE.y + b.wW.y) / 2, z: 0 };
+      const d = own ? Math.hypot(mid.x - own.position.x, mid.y - own.position.y) : 400;
+      if (d > 1250) continue;
+      const haze = hazeOf(d), near = 1 - haze;
+
+      const q = (p, z) => ({ x: p.x, y: p.y, z: z });
+
+      /* flat land beyond the embankment */
+      const land = 'rgba(' + Math.round(22 + haze * 12) + ',' +
+        Math.round(30 + haze * 14) + ',' + Math.round(27 + haze * 20) + ',' + A(0.92) + ')';
+      this.fillClipped(P, [q(a.tE, GROUND), q(a.oE, GROUND), q(b.oE, GROUND), q(b.tE, GROUND)], land);
+      this.fillClipped(P, [q(a.tW, GROUND), q(a.oW, GROUND), q(b.oW, GROUND), q(b.tW, GROUND)], land);
+
+      /* the embankment slopes, lit a little more than the flat */
+      const slope = 'rgba(' + Math.round(28 + haze * 10) + ',' +
+        Math.round(38 + haze * 12) + ',' + Math.round(33 + haze * 18) + ',' + A(0.95) + ')';
+      this.fillClipped(P, [q(a.wE, 0), q(a.tE, GROUND), q(b.tE, GROUND), q(b.wE, 0)], slope);
+      this.fillClipped(P, [q(a.wW, 0), q(a.tW, GROUND), q(b.tW, GROUND), q(b.wW, 0)], slope);
+
+      /* the water itself */
+      const wr = Math.round(11 + haze * 12), wg = Math.round(20 + haze * 16), wb = Math.round(25 + haze * 22);
+      this.fillClipped(P, [q(a.wW, 0), q(a.wE, 0), q(b.wE, 0), q(b.wW, 0)],
+        'rgba(' + wr + ',' + wg + ',' + wb + ',' + A(0.96) + ')');
+
+      /* a moving ripple band every other segment — enough to read as water,
+         not enough to read as a grid */
+      if (near > 0.28 && (i % 2 === 0)) {
+        const ph = 0.5 + 0.5 * Math.sin(t * 0.55 + i * 0.9);
+        this.line(P, q(a.wW, 0.05), q(a.wE, 0.05),
+          'rgba(180,205,210,' + A(0.018 + 0.045 * ph * near) + ')', 1);
+      }
+
+      /* waterline edge — the single line that gives the channel its shape */
+      this.line(P, q(a.wE, 0.02), q(b.wE, 0.02), 'rgba(190,210,200,' + A(0.05 + 0.16 * near) + ')', 1);
+      this.line(P, q(a.wW, 0.02), q(b.wW, 0.02), 'rgba(190,210,200,' + A(0.05 + 0.16 * near) + ')', 1);
+      /* the bank road along the top of each embankment */
+      if (near > 0.3) {
+        this.line(P, q(a.tE, GROUND), q(b.tE, GROUND), 'rgba(160,178,168,' + A(0.05 + 0.10 * near) + ')', 1);
+        this.line(P, q(a.tW, GROUND), q(b.tW, GROUND), 'rgba(160,178,168,' + A(0.05 + 0.10 * near) + ')', 1);
+      }
+    }
+
+    /* --- quay wall -------------------------------------------------------- */
+    for (let i = sc.quay.length - 2; i >= 0; i--) {
+      const a = sc.quay[i], b = sc.quay[i + 1];
+      const d = own ? Math.hypot(a.inner.x - own.position.x, a.inner.y - own.position.y) : 999;
+      if (d > 720) continue;
+      this.prism(P, [a.inner, b.inner, b.outer, a.outer], 0, GROUND + 0.5, '#4A5750', 0.85 * env, 0.8);
+    }
+
+    /* --- the bridge, as a structure rather than a dimension --------------- */
+    this.drawBridgeStructure(P, wm, env);
+
+    /* --- props, far to near ---------------------------------------------- */
+    if (!own) return;
+    const vis = [];
+    for (const pr of sc.props) {
+      const dx = pr.p.x - own.position.x, dy = pr.p.y - own.position.y;
+      const d = Math.hypot(dx, dy);
+      if (d > 900) continue;
+      if (d > 420 && pr.t === 'tree' && pr.h < 9) continue;
+      vis.push({ pr, d });
+    }
+    vis.sort((x, y) => y.d - x.d);
+    for (const v of vis) this.drawProp(P, v.pr, v.d, env);
+
+    /* lamp standards last — thin, and they should sit over the road */
+    for (const l of sc.lamps) {
+      const d = Math.hypot(l.p.x - own.position.x, l.p.y - own.position.y);
+      if (d > 520) continue;
+      const a = clamp(1 - d / 560, 0.1, 1) * env;
+      const base = { x: l.p.x, y: l.p.y, z: GROUND };
+      const top = { x: l.p.x, y: l.p.y, z: GROUND + l.h };
+      this.line(P, base, top, 'rgba(150,168,158,' + (a * 0.34).toFixed(3) + ')', 1);
+      const sTop = P.project(top);
+      if (sTop) {
+        g.fillStyle = 'rgba(224,200,140,' + (a * 0.5).toFixed(3) + ')';
+        g.beginPath(); g.arc(sTop.x, sTop.y, clamp(120 / sTop.d, 0.7, 2.2), 0, 6.283); g.fill();
+      }
+    }
+  };
+
+  /* --- a single piece of scenery ---------------------------------------- */
+  Renderer.prototype.drawProp = function (P, pr, d, env) {
+    const g = this.ctx;
+    const fade = clamp(1 - (d - 220) / 700, 0.14, 1) * env;
+
+    if (pr.t === 'tree') {
+      const base = P.project({ x: pr.p.x, y: pr.p.y, z: GROUND });
+      const top = P.project({ x: pr.p.x, y: pr.p.y, z: GROUND + pr.h });
+      if (!base || !top) return;
+      const rad = clamp((pr.r / base.d) * P.f, 0.8, 200);
+      /* trunk */
+      g.strokeStyle = 'rgba(46,42,34,' + (fade * 0.8).toFixed(3) + ')';
+      g.lineWidth = clamp(rad * 0.22, 0.7, 5);
+      g.beginPath(); g.moveTo(base.x, base.y); g.lineTo(top.x, (top.y + base.y) / 2); g.stroke();
+      const cy = lerp(base.y, top.y, 0.72), ch = (base.y - top.y);
+      const tone = 'rgba(' + Math.round(34 * pr.k) + ',' + Math.round(56 * pr.k) + ',' +
+        Math.round(40 * pr.k) + ',' + (fade * 0.94).toFixed(3) + ')';
+      g.fillStyle = tone;
+      g.beginPath();
+      if (pr.conifer) {
+        g.moveTo(base.x, top.y);
+        g.lineTo(base.x - rad, base.y - ch * 0.16);
+        g.lineTo(base.x + rad, base.y - ch * 0.16);
+      } else {
+        g.ellipse(base.x, cy, rad, Math.max(rad * 0.82, ch * 0.34), 0, 0, 6.283);
+      }
+      g.closePath(); g.fill();
+      return;
+    }
+
+    if (pr.t === 'silo') {
+      const sides = [];
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2;
+        sides.push({ x: pr.p.x + Math.cos(a) * pr.r, y: pr.p.y + Math.sin(a) * pr.r });
+      }
+      this.prism(P, sides, GROUND, GROUND + pr.h, '#5C6660', fade * 0.95, 1.05);
+      return;
+    }
+
+    /* building */
+    const base = rectCorners(pr.p, pr.heading, pr.len, pr.beam);
+    const tone = pr.kind === 'shed' ? '#59635C' : '#6A6259';
+    this.prism(P, base, GROUND, GROUND + pr.h, tone, fade * 0.95, pr.kind === 'shed' ? 1.12 : 0.9);
+    /* a few lit windows, so the bank reads as inhabited at night */
+    if (d < 340) {
+      const F = fwd(pr.heading), Pt = port(pr.heading);
+      for (let k = 0; k < 3; k++) {
+        const u = (k - 1) * pr.len * 0.26;
+        const p = {
+          x: pr.p.x + F.x * u + Pt.x * pr.beam * 0.5,
+          y: pr.p.y + F.y * u + Pt.y * pr.beam * 0.5,
+          z: GROUND + pr.h * 0.55
+        };
+        const sp = P.project(p);
+        if (!sp) continue;
+        const w = clamp(260 / sp.d, 0.8, 5);
+        g.fillStyle = 'rgba(226,198,132,' + (fade * 0.42).toFixed(3) + ')';
+        g.fillRect(sp.x - w / 2, sp.y - w / 2, w, w * 0.8);
+      }
+    }
+  };
+
+  /* --- bridge as built structure ---------------------------------------- */
+  Renderer.prototype.drawBridgeStructure = function (P, wm, env) {
+    const b = wm.getBridgeState();
+    if (!b) return;
+    /* it materialises as the model becomes sure of it — which is the point */
+    const a = clamp(b.confidence * 1.25, 0, 1) * env;
+    if (a < 0.05) return;
+    const bp = port(b.heading), bf = fwd(b.heading);
+    const span = 168, deckW = 12, deckT = 2.4;
+    const at = (u, v) => ({ x: b.position.x - bp.x * u + bf.x * v, y: b.position.y - bp.y * u + bf.y * v });
+    const deck = [at(-span, -deckW / 2), at(span, -deckW / 2), at(span, deckW / 2), at(-span, deckW / 2)];
+    this.prism(P, deck, b.clearance, b.clearance + deckT, '#6E7873', a * 0.95, 1.0);
+
+    /* parapets */
+    const rail = (v) => {
+      const z0 = b.clearance + deckT, z1 = z0 + 1.3;
+      this.line(P, { x: at(-span, v).x, y: at(-span, v).y, z: z1 },
+        { x: at(span, v).x, y: at(span, v).y, z: z1 },
+        'rgba(200,214,206,' + (a * 0.4).toFixed(3) + ')', 1.2);
+      for (let u = -span; u <= span; u += 16) {
+        this.line(P, { x: at(u, v).x, y: at(u, v).y, z: z0 },
+          { x: at(u, v).x, y: at(u, v).y, z: z1 },
+          'rgba(200,214,206,' + (a * 0.22).toFixed(3) + ')', 1);
+      }
+    };
+    rail(-deckW / 2); rail(deckW / 2);
+
+    /* abutments outside the navigable opening, down to the water */
+    const halfOpen = b.openingWidth / 2, off = b.openingOffset;
+    [-1, 1].forEach((sg) => {
+      const u = off + sg * (halfOpen + 26);
+      const foot = [at(u - 9, -7), at(u + 9, -7), at(u + 9, 7), at(u - 9, 7)];
+      this.prism(P, foot, 0, b.clearance + deckT, '#525C57', a * 0.9, 0.85);
+    });
+
+    /* the arch over the navigable span, so the opening reads from far off */
+    const arch = [];
+    for (let i = 0; i <= 18; i++) {
+      const u = off - halfOpen + (i / 18) * b.openingWidth;
+      const k = 1 - Math.pow((i / 18) * 2 - 1, 2);
+      const q = at(u, 0);
+      arch.push({ x: q.x, y: q.y, z: b.clearance + deckT + 1.2 + k * 9 });
+    }
+    this.polyline(P, arch, 'rgba(200,214,206,' + (a * 0.34).toFixed(3) + ')', 1.2);
+    for (let i = 1; i < 18; i += 2) {
+      const q = arch[i];
+      this.line(P, q, { x: q.x, y: q.y, z: b.clearance + deckT },
+        'rgba(200,214,206,' + (a * 0.18).toFixed(3) + ')', 1);
+    }
+  };
+
+  /* =====================================================================
+     GUIDANCE — the manoeuvre the model has ordered, drawn where it happens.
+     ================================================================== */
+  Renderer.prototype.drawGuidance = function (P, wm) {
+    const G = wm.getGuidance && wm.getGuidance();
+    const own = wm.getOwnVessel();
+    if (!G || !own) return;
+    const g = this.ctx;
+    const F = fwd(own.heading), Pt = port(own.heading);
+    const look = 150;
+
+    if (G.active && G.grade !== 'keeping clear') {
+      /* the ordered aim point, and the lateral order that produced it */
+      const straight = { x: own.position.x + F.x * look, y: own.position.y + F.y * look, z: 0.4 };
+      const aim = {
+        x: straight.x + Pt.x * G.lateralDemand,
+        y: straight.y + Pt.y * G.lateralDemand, z: 0.4
+      };
+      const pulse = 0.6 + 0.4 * Math.abs(Math.sin((wm.time || 0) * 2.2));
+      this.line(P, { x: own.position.x, y: own.position.y, z: 0.4 }, aim,
+        hexA(C.signal, 0.42 * pulse), 1.4, [7, 6]);
+      this.line(P, straight, aim, hexA(C.signal, 0.3), 1, [3, 4]);
+
+      const sa = P.project(aim);
+      if (sa) {
+        g.strokeStyle = hexA(C.signal, 0.85 * pulse); g.lineWidth = 1.4;
+        g.beginPath(); g.arc(sa.x, sa.y, 7, 0, 6.283); g.stroke();
+        g.beginPath(); g.moveTo(sa.x - 11, sa.y); g.lineTo(sa.x + 11, sa.y);
+        g.moveTo(sa.x, sa.y - 11); g.lineTo(sa.x, sa.y + 11); g.stroke();
+      }
+
+      /* ring the object being avoided so the cause is never ambiguous */
+      if (G.targetId) {
+        const e = wm.getEntities().find((q) => q.id === G.targetId);
+        if (e) {
+          const col = C.risk[G.level] || C.signal;
+          this.ellipse(P, e.position, 26 + 8 * pulse, 26 + 8 * pulse, 0,
+            hexA(col, 0.4 * pulse), 1.3, [5, 6]);
+        }
+      }
+    }
+
+    /* the helm order, spelled out */
+    const side = G.lateralDemand >= 0 ? 'PORT' : 'STBD';
+    const off = Math.abs(G.lateralDemand).toFixed(0) + ' M ' + side;
+    const head = { bridge: 'LINING UP · ', constrained: 'BANK-LIMITED · ',
+                   avoiding: 'AVOIDING · ', 'keeping clear': 'KEEPING CLEAR · ' };
+    const txt = !G.active ? 'HOLDING LANE'
+      : (head[G.grade] || 'MANOEUVRING · ') +
+        (G.targetId && G.grade !== 'keeping clear' ? G.targetId + ' · ' : '') + off;
+    const spd = G.speedFactor < 0.97 ? '   ENGINE ' + (G.speedFactor * 100).toFixed(0) + '%' : '';
+    const full = txt + spd;
+    this.mono(10, 500);
+    const w = g.measureText(full).width + 22;
+    const x = this.W / 2 - w / 2, y = this.H - 34;
+    const loud = G.active && G.grade !== 'keeping clear';
+    g.fillStyle = loud ? 'rgba(201,242,110,0.09)' : 'rgba(10,14,12,0.55)';
+    g.strokeStyle = loud ? hexA(C.signal, 0.45) : 'rgba(245,246,242,0.16)';
+    g.lineWidth = 1;
+    g.beginPath();
+    if (g.roundRect) g.roundRect(x, y, w, 22, 11); else g.rect(x, y, w, 22);
+    g.fill(); g.stroke();
+    this.text(full, this.W / 2, y + 15,
+      loud ? C.signal : 'rgba(245,246,242,0.55)', 10, 500, 'center');
+  };
   NS.rendering = { Renderer, Camera, Projector, hexA, labelFor };
 })(window.CORNU);

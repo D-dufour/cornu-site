@@ -146,6 +146,12 @@
     this.sweptVolume = null;
     this.risks = [];
     this.alerts = [];
+    /* the one command this model issues: how far off the nominal lane to
+       aim, and how hard to drive. Written by planAvoidance, read by the helm. */
+    this.guidance = {
+      lateralDemand: 0, speedFactor: 1, active: false,
+      targetId: null, reason: 'lane', level: 'none', bridgeLock: false
+    };
     this.time = 0;
     this.updateCount = 0;
     this.observationCount = 0;
@@ -161,6 +167,7 @@
   WorldModel.prototype.getBridgeState = function () { return this.bridgeEst.state; };
   WorldModel.prototype.getOccupancy = function () { return this.occupancy.list(); };
   WorldModel.prototype.getOwnVessel = function () { return this.ownVessel; };
+  WorldModel.prototype.getGuidance = function () { return this.guidance; };
 
   /* -----------------------------------------------------------------------
      update(observations, structural, ego, dt, now)
@@ -211,6 +218,9 @@
 
     /* 7. risk -------------------------------------------------------------- */
     this.assessRisk();
+
+    /* 8. decide ------------------------------------------------------------ */
+    this.planAvoidance(dt);
 
     return this;
   };
@@ -474,6 +484,316 @@
       seen.add(k); return true;
     }).slice(0, 6);
   };
+
+  /* -----------------------------------------------------------------------
+     Avoidance (§20) — the first function in the stack that commits.
+
+     Everything above observes. This decides, and what it decides the helm
+     executes. It emits one number — metres to port of the nominal
+     keep-right lane — plus an engine order.
+
+     Two things make this harder than it reads.
+
+     The frame. A hazard 400 m ahead in a channel that meanders is not
+     where a straight line out of the bow says it is; on this waterway the
+     bend alone is worth tens of metres, enough to place a vessel dead
+     ahead somewhere off the port bow and have the geometry come out
+     backwards. So clearances are measured across the predicted path, the
+     same frame the corridor is measured in, not across the compass.
+
+     The commitment. A vessel met head-on sweeps from fine on the bow to
+     abeam to astern, and its bearing crosses the centreline while it does;
+     meanwhile the tracker may re-number it twice on the way past. Deciding
+     again on every update means altering to starboard, then to port, then
+     to starboard, and a hull this size simply oscillates in place. So what
+     is owned is the side, not the track: chosen once, held through the
+     pass, released a few seconds after the last hazard needs it.
+     -------------------------------------------------------------------- */
+  WorldModel.prototype.planAvoidance = function (dt) {
+    const own = this.ownVessel, G = this.guidance;
+    if (!own) return;
+
+    const F = fwd(own.heading), Pt = port(own.heading);
+    const ownLen = own.dimensions.length, halfBeam = own.dimensions.beam / 2;
+    const RANK = { none: 0, low: 1, medium: 2, high: 3, critical: 4 };
+    const byId = new Map();
+    for (const e of this.entities) byId.set(e.id, e);
+
+    /* --- where a hazard sits relative to the path we intend to follow --- */
+    const spine = this.sweptVolume ? this.sweptVolume.footprints : null;
+    const frameOf = (p) => {
+      if (!spine || !spine.length) {
+        const dx = p.x - own.position.x, dy = p.y - own.position.y;
+        return { along: dx * F.x + dy * F.y, across: dx * Pt.x + dy * Pt.y };
+      }
+      let bi = 0, bd = Infinity;
+      for (let i = 0; i < spine.length; i++) {
+        const ex = spine[i].centre.x - p.x, ey = spine[i].centre.y - p.y;
+        const d = ex * ex + ey * ey;
+        if (d < bd) { bd = d; bi = i; }
+      }
+      const fp = spine[bi];
+      const Ff = fwd(fp.heading), Pf = port(fp.heading);
+      const dx = p.x - fp.centre.x, dy = p.y - fp.centre.y;
+      return {
+        along: fp.t * Math.max(own.speed, 0.5) + dx * Ff.x + dy * Ff.y,
+        across: dx * Pf.x + dy * Pf.y
+      };
+    };
+
+    /* the lateral half-extent of an oriented hull — a vessel lying parallel
+       to us is as wide as its beam, not as wide as its length */
+    const halfAcross = (e) => {
+      const rel = wrapPi(e.heading - own.heading);
+      return Math.abs(Math.cos(rel)) * e.dimensions.beam / 2 +
+             Math.abs(Math.sin(rel)) * e.dimensions.length / 2;
+    };
+    /* What counts as too close to accept. Deliberately tighter than the
+       corridor's own margin: the corridor is the water the vessel would
+       like, this is the water it will alter course to get. Using the wider
+       figure here puts the helm in a permanent manoeuvre on a waterway this
+       busy, and a warning that is always on is not a warning. */
+    const clearanceFor = (e) => halfBeam + halfAcross(e) +
+                                CFG.risk.safetyMargin * 0.6 +
+                                Math.min(e.positionUncertainty, 8);
+    /* the rate the gap is actually shutting — a vessel met head-on arrives
+       at the sum of both speeds, not at ours */
+    const closingOn = (e) =>
+      Math.max(own.speed - (e.velocity.x * F.x + e.velocity.y * F.y), 0.8);
+
+    /* --- 0. how much water there is either side --------------------------
+       Bounded by the mapped shoreline, not by the hazard-shrunk corridor:
+       the corridor narrows around every tracked object, and those are
+       answered by the repulsion term below, so clamping to it as well would
+       double-count them and feed its per-station noise into the helm. */
+    const cor = this.corridor;
+    if (cor && cor.sections.length) {
+      const sec = cor.sections[Math.min(5, cor.sections.length - 1)];
+      const margin = CFG.risk.bankMargin + halfBeam;
+      const rawP = Math.max(0, Math.min(sec.rawPort, 220) - margin);
+      const rawS = Math.max(0, Math.min(sec.rawStbd, 220) - margin);
+      const k = clamp(dt * 1.4, 0, 1);
+      if (!this._corLim) this._corLim = { port: rawP, stbd: rawS };
+      this._corLim.port += (rawP - this._corLim.port) * k;
+      this._corLim.stbd += (rawS - this._corLim.stbd) * k;
+    }
+    const roomPort = this._corLim ? this._corLim.port : 60;
+    const roomStbd = this._corLim ? this._corLim.stbd : 60;
+
+    /* Room is not a property of where we are, it is a property of where the
+       meeting happens. A starboard alteration that has room here and none
+       alongside the quay four hundred metres up is not a plan. The corridor
+       already measures both banks along the whole predicted path, so the
+       side is chosen against the water that will actually be there. */
+    const bankMargin = CFG.risk.bankMargin + halfBeam;
+    const roomAt = (along) => {
+      if (!cor || !cor.sections.length) return { port: roomPort, stbd: roomStbd };
+      const speed = Math.max(own.speed, 0.5);
+      let bi = 0, bd = Infinity;
+      for (let i = 0; i < cor.sections.length; i++) {
+        const d = Math.abs(cor.sections[i].t * speed - along);
+        if (d < bd) { bd = d; bi = i; }
+      }
+      /* the tightest point between here and there is what governs */
+      let p = Infinity, st = Infinity;
+      for (let i = 0; i <= bi; i++) {
+        p = Math.min(p, Math.min(cor.sections[i].rawPort, 220));
+        st = Math.min(st, Math.min(cor.sections[i].rawStbd, 220));
+      }
+      return { port: Math.max(0, p - bankMargin), stbd: Math.max(0, st - bankMargin) };
+    };
+
+    /* --- 1. the hazard that governs, if there is one --------------------- */
+    let best = null;
+    for (const r of this.risks) {
+      if (RANK[r.level] < 2 && !r.conflict) continue;
+      const e = byId.get(r.entityId);
+      if (!e || e.semanticClass === 'buoy') continue;
+
+      const fr = frameOf(e.position);
+      /* only what is still ahead of the bow can be steered around; once a
+         hazard is abeam, altering course swings the stern into it */
+      /* The across measurement is only meaningful where there is a predicted
+         path to measure it against. Past the end of the swept volume the
+         frame is an extrapolated straight line down a channel that bends,
+         and a vessel dead ahead can come out tens of metres off the bow. So
+         the decision waits until the hazard is inside the horizon the model
+         can actually reason in. */
+      const horizon = spine && spine.length
+        ? spine[spine.length - 1].t * Math.max(own.speed, 0.5) + 60 : 400;
+      if (fr.along < ownLen * 0.6 || fr.along > horizon) continue;
+
+      const need = clearanceFor(e);
+      const shortfall = need - Math.abs(fr.across);
+      if (shortfall <= 3) continue;                        // passing clear already
+
+      const rank = RANK[r.level] + (r.conflict ? 1 : 0);
+      const score = rank * 1000 - fr.along;                // worst first, then nearest
+      if (!best || score > best.score) {
+        best = {
+          id: e.id, e, fr, need, magnitude: shortfall, score,
+          level: r.level, rank, closing: closingOn(e)
+        };
+      }
+    }
+
+    /* --- 2. own the side, not the track ---------------------------------- */
+    let C2 = this._commit;
+    if (best) {
+      if (!C2 || C2.hold <= 0) {
+        /* Rule of the road first: alter to starboard, unless the hazard is
+           plainly on the starboard bow and the shorter way round is to
+           port. The dead band keeps a bearing near dead-ahead from picking
+           a side twice running.
+
+           Then the bank has a say. A vessel met head-on while it runs on
+           our side of the channel cannot always be cleared to starboard —
+           there may not be that much water there — while the full width of
+           the channel lies open to port. On inland waterways that case is
+           not a violation but a signal: the blue board, agreeing a
+           starboard-to-starboard pass. A side that cannot achieve the
+           clearance yields to one that can. */
+        let side = best.fr.across < -8 ? 1 : -1;             // +1 = to port
+        const rm = roomAt(best.fr.along);
+        const roomOn = (sd) => (sd > 0 ? rm.port : rm.stbd);
+        if (roomOn(side) < best.magnitude && roomOn(-side) > roomOn(side) + 8) side = -side;
+        C2 = { side, hold: 0, magnitude: 0, targetId: null, level: 'none', flipped: false };
+      }
+      /* One reconsideration, while there is still distance to use it. The
+         model can be wrong about the room the first time — a bank it has
+         not mapped yet, a hazard whose size it has revised — but a helm
+         that changes its mind twice has no plan at all. */
+      if (!C2.flipped && !C2.passing && best.fr.along > 170) {
+        const rm = roomAt(best.fr.along);
+        const here = C2.side > 0 ? rm.port : rm.stbd;
+        const other = C2.side > 0 ? rm.stbd : rm.port;
+        if (here < best.magnitude - 4 && other > here * 1.8 + 10) {
+          C2.side = -C2.side;
+          C2.flipped = true;
+        }
+      }
+      C2.hold = 6;                                           // s, refreshed while needed
+      C2.magnitude = best.magnitude;
+      C2.targetId = best.id;
+      C2.level = best.level;
+      C2.along = best.fr.along;
+      C2.closing = best.closing;
+      C2.passing = false;
+    } else if (C2) {
+      /* nothing ahead needs it any more — hold the offset while the last
+         one goes down the side, then give it back */
+      C2.hold -= dt;
+      C2.passing = true;
+      if (C2.hold <= 0) C2 = null;
+    }
+    this._commit = C2;
+
+    /* --- 3. turn it into an order ---------------------------------------- */
+    let demand = 0, speed = 1;
+    let targetId = null, reason = 'lane', level = 'none';
+
+    if (C2) {
+      /* How early to commit is the whole question. Waiting until a hazard
+         looks near means altering with no water left to alter into, and
+         making the alteration early and obviously is what the rules ask
+         for anyway. */
+      let urgency = 1;
+      if (!C2.passing) {
+        const ttg = Math.max(C2.along, 0) / (C2.closing || Math.max(own.speed, 1));
+        urgency = clamp(1 - (ttg - 30) / 40, 0.65, 1);
+      }
+      demand = C2.magnitude * C2.side * urgency;
+      targetId = C2.targetId; reason = 'avoiding'; level = C2.level;
+      if (C2.level === 'critical') speed = 0.68;
+      else if (C2.level === 'high') speed = 0.82;
+    }
+
+    /* --- 4. line up on the bridge opening -------------------------------- */
+    let bridgeLock = false;
+    const b = this.bridgeEst.state;
+    if (b && b.range !== undefined && b.range < 480 && b.confidence > 0.35) {
+      const bp = port(b.heading);
+      const oc = {
+        x: b.position.x - bp.x * b.openingOffset,
+        y: b.position.y - bp.y * b.openingOffset, z: 0
+      };
+      const fr = frameOf(oc);
+      const blend = clamp(1 - (b.range - 100) / 320, 0, 1);
+      const aim = fr.across * blend;
+      bridgeLock = blend > 0.15;
+      /* the opening wins only when nothing is actively being avoided */
+      if (!C2 && Math.abs(aim) > 0.5) {
+        demand = aim; targetId = b.id; reason = 'bridge';
+        level = b.passable ? 'low' : 'high';
+      }
+      if (b.range < 300) speed = Math.min(speed, b.passable ? 0.88 : 0.32);
+    }
+
+    /* --- 5. never steer into a bank -------------------------------------- */
+    if (this._corLim) {
+      const bounded = clamp(demand, -roomStbd, roomPort);
+      /* Being trimmed by a metre or two is just the bank being where it is.
+         Only a shortfall large enough to matter is a predicament worth
+         reporting and worth taking way off for. */
+      if (Math.abs(bounded) < Math.abs(demand) - 6 && reason === 'avoiding') {
+        /* The bank will not give us the room the hazard needs. Course alone
+           cannot solve this meeting, so the other lever comes in: take the
+           way off. Slowing buys the seconds steering could not, and a
+           shortfall the model cannot steer out of is worth saying so. */
+        reason = 'constrained';
+        /* Steering has run out of water. The other lever is speed, and it is
+           not a token reduction: a meeting that cannot be cleared by course
+           is cleared by arriving later, or by not arriving at all until the
+           other vessel is past. */
+        const shortBy = Math.abs(demand) - Math.abs(bounded);
+        speed = Math.min(speed, clamp(1 - shortBy / 30, 0.5, 0.92));
+      }
+      demand = bounded;
+      if (cor && cor.minWidth < own.dimensions.beam * 2.4) speed = Math.min(speed, 0.75);
+    }
+
+    /* --- 6. rate-limit, so the order is a manoeuvre and not a twitch ----- */
+    const step = Math.max(dt, 1e-3);
+    G.lateralDemand += clamp(demand - G.lateralDemand, -6 * step, 6 * step);
+    G.speedFactor += clamp(speed - G.speedFactor, -0.7 * step, 0.3 * step);
+    G.speedFactor = clamp(G.speedFactor, 0.42, 1);
+    G.active = Math.abs(G.lateralDemand) > 2.5 || G.speedFactor < 0.95;
+    G.targetId = targetId;
+    G.reason = reason;
+    G.level = level;
+    G.bridgeLock = bridgeLock;
+    G.phase = C2 ? (C2.passing ? 'passing' : 'approach') : '—';
+    /* A waterway this busy means the vessel is nearly always shifting over
+       for something, and a readout that says AVOIDING all day says nothing.
+       A routine shift for a vessel being met is not the same event as a
+       manoeuvre driven by a predicted conflict, so they are not given the
+       same word. */
+    G.grade = reason === 'lane' ? 'lane'
+      : reason === 'bridge' ? 'bridge'
+      : reason === 'constrained' ? 'constrained'
+      : (level === 'high' || level === 'critical' || Math.abs(G.lateralDemand) > 14)
+        ? 'avoiding' : 'keeping clear';
+
+    if (G.active && reason !== 'lane' && G.grade !== 'keeping clear') {
+      const sideName = G.lateralDemand >= 0 ? 'port' : 'starboard';
+      const mag = Math.abs(G.lateralDemand).toFixed(0);
+      const slow = G.speedFactor < 0.95
+        ? ', ' + (G.speedFactor * 100).toFixed(0) + '% speed' : '';
+      this.alerts.unshift({
+        level: reason === 'bridge' ? 'low' : (level === 'none' ? 'medium' : level),
+        text: reason === 'bridge'
+          ? 'Lining up on ' + targetId + ' opening — ' + mag + ' m to ' + sideName
+          : (reason === 'constrained'
+              ? 'Avoiding ' + targetId + ' — ' + mag + ' m to ' + sideName +
+                ', bank-limited' + slow
+              : 'Avoiding ' + targetId + ' — ' + mag + ' m to ' + sideName + slow),
+        entityId: targetId, guidance: true
+      });
+      this.alerts = this.alerts.slice(0, 6);
+    }
+  };
+
+
 
   /* highest risk level currently present */
   WorldModel.prototype.overallRisk = function () {

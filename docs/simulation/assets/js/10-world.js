@@ -140,18 +140,47 @@
     this.dims = { length: cfg.length, beam: cfg.beam, height: cfg.airDraft };
     this.cfg = cfg;
     this.stationEstimate = s0;
+    /* set every frame by the world model — the helm never decides anything
+       itself, it only executes. Null until the first model update lands. */
+    this.guidance = null;
+    this.commandedOffset = cfg.laneOffset;
   }
   OwnShip.prototype.step = function (dt, world) {
     const c = this.cfg;
-    /* helm: steer toward a lookahead point on the keep-right lane */
+    /* helm: steer toward a lookahead point on the commanded lane.
+
+       The nominal lane is keep-right. The world model can order the aim
+       point off that lane to clear a hazard or to line up on a bridge
+       opening; `lateralDemand` is metres to port, and waterway offsets are
+       measured to starboard, so it is subtracted. */
     const here = world.waterway.project(this.position);
     this.stationEstimate = here.s;
-    const target = world.waterway.point(here.s + c.lookahead, c.laneOffset);
+
+    const g = this.guidance;
+    const wantOffset = c.laneOffset - (g ? g.lateralDemand : 0);
+    /* ease the commanded offset so a new order is a manoeuvre, not a jump */
+    this.commandedOffset += (wantOffset - this.commandedOffset) * clamp(dt * 2.4, 0, 1);
+
+    /* How hard the helm works is set by how far off the ordered track we
+       actually are, not by how large the order was. Pure pursuit converges
+       on a long lookahead only asymptotically; pulling the aim point in is
+       what turns a standing order into a visible alteration of course. */
+    const crossErr = this.commandedOffset - here.offset;
+    const urgency = clamp(Math.abs(crossErr) / 20, 0, 1);
+    const look = c.lookahead * (1 - urgency * 0.62);
+    const maxYaw = c.maxYawRate * (1 + urgency * 0.85);
+
+    const target = world.waterway.point(here.s + look, this.commandedOffset);
     const desired = Math.atan2(target.x - this.position.x, target.y - this.position.y);
     let err = NS.math.wrapPi(desired - this.heading);
-    const demand = clamp(err * c.helmGain, -c.maxYawRate, c.maxYawRate);
+    const demand = clamp(err * c.helmGain * (1 + urgency * 0.6), -maxYaw, maxYaw);
     this.yawRate += (demand - this.yawRate) * clamp(dt * c.helmDamping, 0, 1);
     this.heading = NS.math.wrapPi(this.heading + this.yawRate * dt);
+
+    /* engine: the model can order a reduction, the hull takes time to lose way */
+    const wantSpeed = c.cruiseSpeed * (g ? g.speedFactor : 1);
+    this.speed += clamp(wantSpeed - this.speed, -1.1 * dt, 0.45 * dt);
+
     const F = fwd(this.heading);
     this.position = {
       x: this.position.x + F.x * this.speed * dt,
@@ -162,6 +191,8 @@
     if (here.s > world.waterway.length - 90) {
       this.position = world.waterway.point(40, c.laneOffset);
       this.heading = world.waterway.at(40).heading;
+      this.commandedOffset = c.laneOffset;
+      this.speed = c.cruiseSpeed;
       world.onLoop();
     }
   };

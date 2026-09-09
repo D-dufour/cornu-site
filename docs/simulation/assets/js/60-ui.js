@@ -29,9 +29,18 @@
       app.viewMode = v;
       /* the two comparison views of §22 are layer presets, not new cameras */
       const L = app.renderer.layers;
-      if (v === 'model') { L.decor = false; L.groundTruth = false; }
-      if (v === 'blend') { L.decor = true;  L.groundTruth = false; }
-      if (v === 'truth') { L.decor = true;  L.groundTruth = true; }
+      /* World model renders the model as a place — full environment, no
+         ground-truth overlay. The other two keep it, dimmed, so the
+         annotation layers stay on top of it. */
+      if (v === 'model') { L.decor = true; L.groundTruth = false; }
+      if (v === 'blend') { L.decor = true; L.groundTruth = false; }
+      if (v === 'truth') { L.decor = true; L.groundTruth = true; }
+      const mode = document.querySelector('.overlay-tl .mode');
+      if (mode) {
+        mode.textContent = v === 'model' ? 'World model · environment'
+          : v === 'truth' ? 'World model · against ground truth'
+          : 'World model · active';
+      }
       this.syncLayerChecks();
     });
     this.bindGroup('#density', (v) => {
@@ -40,6 +49,8 @@
       const preset = R.presets[v];
       for (const k in preset) R.layers[k] = !!preset[k];
       if (app.viewMode === 'truth') R.layers.groundTruth = true;
+      /* density controls diagnostics, not whether there is a world to look at */
+      R.layers.decor = true;
       this.syncLayerChecks();
     });
     this.bindGroup('#speeds', (v) => { app.timeScale = parseFloat(v); });
@@ -59,7 +70,8 @@
       ['swept', 'Swept volume'], ['occupancy', 'Occupancy grid'],
       ['rawObs', 'Raw observations'], ['frustums', 'Sensor frustums'],
       ['uncertainty', 'Uncertainty'], ['history', 'Track history'],
-      ['groundTruth', 'Ground truth'], ['ranges', 'Range rings']
+      ['groundTruth', 'Ground truth'], ['ranges', 'Range rings'],
+      ['decor', 'Environment']
     ];
     const wrap = $('#layers');
     this.layerInputs = {};
@@ -205,6 +217,23 @@
       ['Bridge conf.', bridge ? (bridge.confidence * 100).toFixed(0) + '%' : '—'],
       ['CPA', worstCpa ? worstCpa.cpa.toFixed(1) + ' m' : '—'],
       ['TCPA', worstCpa ? worstCpa.tcpa.toFixed(0) + ' s' : '—']
+    ]);
+
+    /* what the model has decided to do about all of the above */
+    const G = wm.getGuidance();
+    const manoeuvre = !G.active ? 'holding lane'
+      : G.grade === 'bridge' ? 'lining up on opening'
+      : G.grade === 'constrained' ? 'avoiding — bank-limited'
+      : G.grade === 'keeping clear' ? 'keeping clear'
+      : 'avoiding';
+    this.fillRows('#guideRows', [
+      ['Manoeuvre', manoeuvre],
+      ['Reason', G.targetId || '—'],
+      ['Helm order', (Math.abs(G.lateralDemand) < 0.5 ? '0' :
+        Math.abs(G.lateralDemand).toFixed(1)) + ' m ' +
+        (G.lateralDemand >= 0 ? 'port' : 'stbd')],
+      ['Engine order', (G.speedFactor * 100).toFixed(0) + '%'],
+      ['Bridge lock', G.bridgeLock ? 'engaged' : '—']
     ]);
 
     this.fillRows('#perfRows', [
