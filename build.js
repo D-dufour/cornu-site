@@ -21,32 +21,41 @@ const ITERATIONS = 310000;           // PBKDF2-SHA256 rounds
 const SRC = path.join(__dirname, 'source');
 const OUT = path.join(__dirname, 'docs');
 
-/* ---------- 1. inline the site into one document ---------- */
-function inline() {
-  let html = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8');
-  const css = fs.readFileSync(path.join(SRC, 'assets/css/cornu.css'), 'utf8');
-  const js = fs.readFileSync(path.join(SRC, 'assets/js/cornu.js'), 'utf8');
-  const ico = fs.readFileSync(path.join(SRC, 'assets/img/favicon.svg'), 'utf8');
+/* ---------- 1. inline a page into one document ----------
+   Pages may sit at the root of source/ or a directory below it, so asset
+   references are resolved relative to the page itself ("assets/..." from
+   index.html, "../assets/..." from products/index.html) rather than assumed
+   to be at a fixed depth. */
+function inline(pageRel) {
+  const file = path.join(SRC, pageRel);
+  const dir = path.dirname(file);
+  let html = fs.readFileSync(file, 'utf8');
+  const read = (rel) => fs.readFileSync(path.resolve(dir, rel), 'utf8');
 
   /* replacement FUNCTIONS, not strings — a literal replacement would treat
-     "$$" in the source (e.g. the $$ query helper) as an escaped dollar */
-  html = html.replace(/<link rel="stylesheet" href="assets\/css\/cornu\.css">/,
-    () => '<style>\n' + css + '\n</style>');
-  html = html.replace(/<script src="assets\/js\/cornu\.js"[^>]*><\/script>/,
-    () => '<script>\n' + js + '\n</script>');
-  html = html.replace(/<link rel="icon"[^>]*>/,
-    () => '<link rel="icon" href="data:image/svg+xml,' + encodeURIComponent(ico.trim()) + '">');
-  html = html.replace(/src="(assets\/img\/(?:partners|team)\/[^"?]+\.(png|jpe?g))"/gi, (match, rel, ext) => {
-    const file = path.join(SRC, rel);
-    if (!fs.existsSync(file)) return match;
-    const data = fs.readFileSync(file).toString('base64');
-    const mime = ext.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
-    return 'src="data:' + mime + ';base64,' + data + '"';
-  });
+     "$" in the source (e.g. the $ query helper) as an escaped dollar */
+  html = html.replace(/<link rel="stylesheet" href="((?:\.\.\/)*assets\/css\/cornu\.css)">/,
+    (m, rel) => '<style>\n' + read(rel) + '\n</style>');
+  html = html.replace(/<script src="((?:\.\.\/)*assets\/js\/cornu\.js)"[^>]*><\/script>/,
+    (m, rel) => '<script>\n' + read(rel) + '\n</script>');
+  html = html.replace(/<link rel="icon"[^>]*href="((?:\.\.\/)*assets\/img\/favicon\.svg)"[^>]*>/,
+    (m, rel) => '<link rel="icon" href="data:image/svg+xml,' + encodeURIComponent(read(rel).trim()) + '">');
+  html = html.replace(/<link rel="icon"(?![^>]*data:)[^>]*>/,
+    () => '<link rel="icon" href="data:image/svg+xml,' +
+      encodeURIComponent(fs.readFileSync(path.join(SRC, 'assets/img/favicon.svg'), 'utf8').trim()) + '">');
+  html = html.replace(/src="((?:\.\.\/)*assets\/img\/(?:partners|team)\/[^"?]+\.(png|jpe?g))"/gi,
+    (match, rel, ext) => {
+      const abs = path.resolve(dir, rel);
+      if (!fs.existsSync(abs)) return match;
+      const data = fs.readFileSync(abs).toString('base64');
+      const mime = ext.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+      return 'src="data:' + mime + ';base64,' + data + '"';
+    });
 
   const withoutComments = html.replace(/<!--[\s\S]*?-->/g, '');
-  if (/(href|src)="assets\//.test(withoutComments)) {
-    throw new Error('Unresolved asset reference — every asset must be inlined before encrypting.');
+  if (/(href|src)="(?:\.\.\/)*assets\//.test(withoutComments)) {
+    throw new Error('Unresolved asset reference in ' + pageRel +
+      ' — every asset must be inlined before encrypting.');
   }
   return html;
 }
@@ -180,7 +189,26 @@ function gate(p) {
     setTimeout(function(){
       try { new Function(o.j)(); }
       catch (err) { console.error('Cornu: site script failed', err); }
+      jumpToHash();
     }, 0);
+  }
+
+  /* A link from one page to an anchor on another — products/ back to
+     /#technology — arrives with a fragment the browser has already given up
+     on, because the document it names did not exist at load time. The site
+     also holds scrolling while the loader runs, so the jump waits for that
+     to finish rather than fighting it. */
+  function jumpToHash(){
+    if(!location.hash || location.hash.length < 2) return;
+    var target;
+    try { target = document.querySelector(location.hash); } catch(e) { return; }
+    if(!target) return;
+    var tries = 0;
+    (function go(){
+      var busy = document.body && document.body.classList.contains('is-loading');
+      if(busy && tries++ < 60){ setTimeout(go, 60); return; }
+      try { target.scrollIntoView(); } catch(e) { }
+    })();
   }
 
   async function attempt(password, quiet){
@@ -222,11 +250,26 @@ function gate(p) {
 }
 
 /* ---------- run ---------- */
-const bundle = bundleDocument(inline(), 'site');
-
-const payload = encrypt(bundle, PASSWORD);
 fs.mkdirSync(OUT, { recursive: true });
-fs.writeFileSync(path.join(OUT, 'index.html'), gate(payload));
+
+/* Every page goes behind the same gate, encrypted with the same password.
+   The gate stores the password in sessionStorage, so once a visitor has
+   unlocked one page the others open without asking again in that tab. */
+const pages = [
+  { src: 'index.html', out: 'index.html', label: 'site' },
+  { src: 'products/index.html', out: 'products/index.html', label: 'products' }
+];
+
+const sizes = [];
+for (const p of pages) {
+  const bundle = bundleDocument(inline(p.src), p.label);
+  const dest = path.join(OUT, p.out);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.writeFileSync(dest, gate(encrypt(bundle, PASSWORD)));
+  sizes.push({ label: p.label, out: p.out, raw: Buffer.byteLength(bundle),
+               enc: fs.statSync(dest).size });
+}
+
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
 fs.writeFileSync(path.join(OUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
 const simulationOut = path.join(OUT, 'simulation');
@@ -236,7 +279,11 @@ fs.copyFileSync(path.join(SRC, 'simulation', 'index.html'), path.join(simulation
 copyTree(path.join(SRC, 'simulation', 'assets'), path.join(simulationOut, 'assets'));
 
 const kb = n => (n / 1024).toFixed(1) + ' KB';
-console.log('site      ' + kb(Buffer.byteLength(bundle)));
-console.log('encrypted ' + kb(fs.statSync(path.join(OUT, 'index.html')).size));
+for (const s2 of sizes) {
+  console.log(s2.label.padEnd(9) + ' ' + kb(s2.raw).padStart(10) +
+    '  ->  ' + kb(s2.enc).padStart(10) + '   docs/' + s2.out);
+}
 console.log('password  ' + PASSWORD);
-console.log('\nwrote encrypted docs/index.html and standalone docs/simulation/ — commit docs/, never source/.');
+
+console.log('\nwrote encrypted ' + sizes.map(s2 => 'docs/' + s2.out).join(', ') +
+  ' and standalone docs/simulation/ — commit docs/, never source/.');

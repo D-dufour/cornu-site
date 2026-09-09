@@ -13,7 +13,8 @@ can check a password before deciding what to send you. Any "enter a password"
 overlay on a static site can be skipped by opening the source — unless the page
 content itself is encrypted.
 
-So that is what this does. `docs/index.html` contains:
+So that is what this does. Each published page — `docs/index.html` and
+`docs/products/index.html` — contains:
 
 - the unlock screen, and
 - the entire site encrypted with **AES-256-GCM**, using a key derived from your
@@ -117,7 +118,17 @@ your shell history. If that matters, clear the history line afterwards.
 
 The real site lives in `source/`. Edit it exactly as before — team members,
 copy, colours, everything (see `source/README.md`). Preview your changes by
-opening `source/index.html` directly in a browser; no password there.
+opening `source/index.html` or `source/products/index.html` directly in a
+browser; no password there.
+
+There are two pages. `source/index.html` is the home page and
+`source/products/index.html` is the Bridge Watch product page, published at
+`/products/`. Both share `source/assets/`, and both are encrypted with the
+same password, so a visitor who unlocks one can move between them without
+being asked again in that tab. To add a third page, create it under
+`source/` and add a line to the `pages` array near the bottom of
+`build.js`; asset paths are resolved relative to the page, so a page one
+directory down refers to `../assets/...`.
 
 When it looks right:
 
@@ -176,11 +187,23 @@ public. It solves a different problem than the one you asked about.
 
 ```
 .
-├── build.js        inline → encrypt → write docs/index.html
-├── docs/           what gets published (commit this)
-│   ├── index.html  unlock screen + encrypted site
+├── build.js               inline → encrypt → write each page into docs/
+├── docs/                  what gets published (commit this)
+│   ├── index.html         unlock screen + encrypted home page
+│   ├── products/
+│   │   └── index.html     unlock screen + encrypted Bridge Watch page
+│   ├── simulation/        the interactive simulation, not encrypted
 │   ├── robots.txt
 │   └── .nojekyll
-├── source/         the real site, unencrypted (never commit)
-└── .gitignore      keeps source/ out of the repo
+├── source/                the real site, unencrypted (never commit)
+│   ├── index.html         home
+│   ├── products/index.html  Bridge Watch
+│   ├── simulation/        simulation sources
+│   └── assets/            css, js, images shared by every page
+└── .gitignore             keeps source/ out of the repo
 ```
+
+Note that `docs/simulation/` is published in the clear — it is copied, not
+encrypted, because it is a standalone application rather than a page of the
+site. Keep that in mind before putting anything in it you would not want
+read without the password.
