@@ -141,7 +141,6 @@
     const H = [[0, 0, ux, uy]];
     const pred = H[0][2] * this.x[2][0] + H[0][3] * this.x[3][0];
     const PHt = M.mul(this.P, M.T(H));                 // 4x1
-    const S = PHt[0][0] * H[0][0] + 0;                  // placeholder, computed below
     let s = variance;
     for (let i = 0; i < 4; i++) s += H[0][i] * PHt[i][0];
     const K = PHt.map((r) => [r[0] / s]);

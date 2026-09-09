@@ -32,6 +32,16 @@ function inline(pageRel) {
   let html = fs.readFileSync(file, 'utf8');
   const read = (rel) => fs.readFileSync(path.resolve(dir, rel), 'utf8');
 
+  /* Comments are for whoever edits source/, not for whoever reads the
+     published page. Stripping them here means section markers and any
+     authoring notes left in the markup never ship, and nobody has to
+     remember to take them out before a build.
+
+     This runs before the CSS and JS are inlined: afterwards the document
+     contains a script, and an HTML-level strip could mangle a "-->" that
+     happened to appear inside it. */
+  html = html.replace(/<!--[\s\S]*?-->/g, '');
+
   /* replacement FUNCTIONS, not strings — a literal replacement would treat
      "$" in the source (e.g. the $ query helper) as an escaped dollar */
   html = html.replace(/<link rel="stylesheet" href="((?:\.\.\/)*assets\/css\/cornu\.css)">/,
@@ -52,8 +62,7 @@ function inline(pageRel) {
       return 'src="data:' + mime + ';base64,' + data + '"';
     });
 
-  const withoutComments = html.replace(/<!--[\s\S]*?-->/g, '');
-  if (/(href|src)="(?:\.\.\/)*assets\//.test(withoutComments)) {
+  if (/(href|src)="(?:\.\.\/)*assets\//.test(html)) {
     throw new Error('Unresolved asset reference in ' + pageRel +
       ' — every asset must be inlined before encrypting.');
   }
