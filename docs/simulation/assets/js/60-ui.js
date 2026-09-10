@@ -223,7 +223,7 @@
     const G = wm.getGuidance();
     const manoeuvre = !G.active ? 'holding lane'
       : G.grade === 'bridge' ? 'lining up on opening'
-      : G.grade === 'constrained' ? 'avoiding — bank-limited'
+      : G.grade === 'constrained' ? 'holding for clear passage'
       : G.grade === 'keeping clear' ? 'keeping clear'
       : 'avoiding';
     this.fillRows('#guideRows', [

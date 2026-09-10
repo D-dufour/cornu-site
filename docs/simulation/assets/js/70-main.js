@@ -36,7 +36,10 @@
     this.provider = new NS.sensors.SimulationPerceptionProvider(this.world);
     this.wm = new NS.worldmodel.WorldModel(this.provider);
     this.simTime = 0;
+    this._acc = {sensors:0, wm:0, ui:0};
+    this._counters = {wm:0, sensors:0, frames:0, t:0};
     this.recentObs = [];
+    this.world.onLoop = () => { this._restartPending = true; };
     this.renderer.selectedId = null;
     const insp = document.getElementById('inspector');
     if (insp) insp.classList.remove('open');
@@ -52,6 +55,11 @@
       const h = Math.min(physicsStep, remaining);
       this.world.step(h);
       remaining -= h;
+    }
+    if (this._restartPending) {
+      this._restartPending = false;
+      this.loadScenario(this.scenarioId);
+      return;
     }
     this.simTime += dt;
 

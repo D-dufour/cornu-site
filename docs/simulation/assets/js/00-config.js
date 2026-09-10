@@ -39,6 +39,12 @@ CORNU.CFG = {
     laneOffset: 22           // m to starboard of centreline (keep-right)
   },
 
+  navigation: {
+    horizon: 90, sampleStep: 2, replanPeriod: 0.6,
+    bankMargin: 5, bridgeMargin: 2, contactMargin: 5,
+    deceleration: 1.1, acceleration: 0.45
+  },
+
   /* --- waterway --------------------------------------------------------- */
   waterway: {
     length: 1750,            // m of navigable environment

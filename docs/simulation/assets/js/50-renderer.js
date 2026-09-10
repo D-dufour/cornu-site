@@ -163,12 +163,12 @@
        see. Engineering restores every diagnostic layer. */
     this.dense = false;
     this.layers = {
-      semantic: true, ids: true, predictions: true, corridor: true, swept: true,
+      semantic: true, ids: true, predictions: false, corridor: false, swept: true,
       occupancy: false, rawObs: false, frustums: false, uncertainty: false,
       history: false, groundTruth: false, ranges: false, decor: true
     };
     this.presets = {
-      clean: { semantic: 1, ids: 1, predictions: 1, corridor: 1, swept: 1,
+      clean: { semantic: 1, ids: 1, predictions: 0, corridor: 0, swept: 1,
                occupancy: 0, rawObs: 0, frustums: 0, uncertainty: 0,
                history: 0, groundTruth: 0, ranges: 0 },
       dense: { semantic: 1, ids: 1, predictions: 1, corridor: 1, swept: 1,
@@ -393,7 +393,7 @@
 
     if (this.layers.occupancy) this.drawOccupancy(P, wm);
     if (this.layers.corridor) this.drawCorridor(P, wm);
-    this.drawStaticMap(P, wm);
+    if (this.dense || !this.layers.decor) this.drawStaticMap(P, wm);
     if (this.layers.ranges) this.drawRangeRings(P, own);
     if (this.layers.frustums) this.drawFrustums(P, provider, world);
     if (this.layers.rawObs) this.drawRawObservations(P, provider);
@@ -601,7 +601,8 @@
   };
 
   Renderer.prototype.drawSweptVolume = function (P, wm) {
-    const sv = wm.getPredictions().own;
+    const guidance = wm.getGuidance();
+    const sv = guidance && guidance.path ? {footprints:guidance.path} : wm.getPredictions().own;
     if (!sv) return;
     const L = [], R = [];
     for (const f of sv.footprints) {
@@ -610,9 +611,9 @@
       R.push({ x: f.centre.x - Pt.x * f.beam / 2, y: f.centre.y - Pt.y * f.beam / 2, z: 0.3 });
     }
     /* one continuous path the vessel intends to occupy, fading with distance */
-    this.ribbon(P, L, R, '201,242,110', 0.20, 0.012);
-    this.polyline(P, L, 'rgba(201,242,110,0.30)', 1.2);
-    this.polyline(P, R, 'rgba(201,242,110,0.30)', 1.2);
+    this.ribbon(P, L, R, '201,242,110', this.dense ? 0.20 : 0.055, 0.008);
+    this.polyline(P, L, 'rgba(201,242,110,0.20)', 1);
+    this.polyline(P, R, 'rgba(201,242,110,0.20)', 1);
 
     /* time markers only in engineering density */
     if (!this.dense) return;
@@ -911,7 +912,6 @@
     const own = wm.getOwnVessel();
     const sc = this.scenery(world);
     const rails = sc.rails, n = rails.length;
-    const t = wm.time || 0;
 
     /* work in station space around the vessel so cost stays constant */
     const s0 = world.ownShip ? world.ownShip.stationEstimate : 0;
@@ -951,14 +951,6 @@
       const wr = Math.round(11 + haze * 12), wg = Math.round(20 + haze * 16), wb = Math.round(25 + haze * 22);
       this.fillClipped(P, [q(a.wW, 0), q(a.wE, 0), q(b.wE, 0), q(b.wW, 0)],
         'rgba(' + wr + ',' + wg + ',' + wb + ',' + A(0.96) + ')');
-
-      /* a moving ripple band every other segment — enough to read as water,
-         not enough to read as a grid */
-      if (near > 0.28 && (i % 2 === 0)) {
-        const ph = 0.5 + 0.5 * Math.sin(t * 0.55 + i * 0.9);
-        this.line(P, q(a.wW, 0.05), q(a.wE, 0.05),
-          'rgba(180,205,210,' + A(0.018 + 0.045 * ph * near) + ')', 1);
-      }
 
       /* waterline edge — the single line that gives the channel its shape */
       this.line(P, q(a.wE, 0.02), q(b.wE, 0.02), 'rgba(190,210,200,' + A(0.05 + 0.16 * near) + ')', 1);
@@ -1132,16 +1124,13 @@
     const own = wm.getOwnVessel();
     if (!G || !own) return;
     const g = this.ctx;
-    const F = fwd(own.heading), Pt = port(own.heading);
+    const F = fwd(own.heading);
     const look = 150;
 
     if (G.active && G.grade !== 'keeping clear') {
       /* the ordered aim point, and the lateral order that produced it */
       const straight = { x: own.position.x + F.x * look, y: own.position.y + F.y * look, z: 0.4 };
-      const aim = {
-        x: straight.x + Pt.x * G.lateralDemand,
-        y: straight.y + Pt.y * G.lateralDemand, z: 0.4
-      };
+      const aim = G.aimPoint ? {...G.aimPoint, z:0.4} : straight;
       const pulse = 0.6 + 0.4 * Math.abs(Math.sin((wm.time || 0) * 2.2));
       this.line(P, { x: own.position.x, y: own.position.y, z: 0.4 }, aim,
         hexA(C.signal, 0.42 * pulse), 1.4, [7, 6]);
@@ -1169,7 +1158,7 @@
     /* the helm order, spelled out */
     const side = G.lateralDemand >= 0 ? 'PORT' : 'STBD';
     const off = Math.abs(G.lateralDemand).toFixed(0) + ' M ' + side;
-    const head = { bridge: 'LINING UP · ', constrained: 'BANK-LIMITED · ',
+    const head = { bridge: 'LINING UP · ', constrained: 'HOLDING \u00b7 ',
                    avoiding: 'AVOIDING · ', 'keeping clear': 'KEEPING CLEAR · ' };
     const txt = !G.active ? 'HOLDING LANE'
       : (head[G.grade] || 'MANOEUVRING · ') +

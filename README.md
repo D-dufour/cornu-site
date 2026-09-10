@@ -207,3 +207,20 @@ Note that `docs/simulation/` is published in the clear — it is copied, not
 encrypted, because it is a standalone application rather than a page of the
 site. Keep that in mind before putting anything in it you would not want
 read without the password.
+
+## Simulation updates and verification
+
+The current deployed simulation is in docs/simulation/. Its authoring copy
+is source/simulation/; the root simulation/ folder is an earlier prototype.
+
+The navigation planner uses a static channel chart plus estimated contacts
+and measured bridge geometry. It evaluates full-hull trajectories with the
+same steering and engine model as the simulated vessel. Orders use absolute
+chart offsets, preserve clearance through the stern passing, and allow a
+full stop when there is no clear passage. The visible route shows the
+commanded trajectory. Clean view keeps calm water and a single route ribbon;
+Engineering restores prediction, corridor and sensor diagnostics.
+
+Run node --test tests/navigation.test.cjs after building. See tests/README.md
+for the regression checks and playback timing options. This is a simulation
+controller using estimated dimensions and channel-following traffic forecasts.

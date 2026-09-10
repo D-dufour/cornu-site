@@ -89,6 +89,12 @@
     SENSORS.forEach((s) => { this.acc[s.id] = this.rng.next() / s.rate; });
   }
 
+  /* Static navigation chart, separate from noisy sensor observations. No
+     contacts, bridge measurements or own-ship truth cross this interface. */
+  SimulationPerceptionProvider.prototype.getNavigationChart = function () {
+    return this.world.waterway.stations.map(s => ({...s, p:{...s.p}, tangent:{...s.tangent}, normal:{...s.normal}}));
+  };
+
   SimulationPerceptionProvider.prototype.sensorList = function () { return SENSORS; };
 
   /* sensor world pose, given the current own-ship state */
