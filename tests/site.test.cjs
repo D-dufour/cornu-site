@@ -21,6 +21,7 @@ async function open(url='/',viewport={width:1440,height:1000}){
   const context=await browser.newContext({viewport,reducedMotion:'reduce'});
   await context.addInitScript(password=>sessionStorage.setItem('cornu.k',password),process.env.CORNU_PASSWORD||'cornu2026!');
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  page.on('console',m=>{if(m.type()==='error'&&m.text().startsWith('Cornu:'))errors.push(m.text());});
   await ready(page,url);return {context,page,errors};
 }
 async function ready(page,url){await page.goto(base+url);await page.locator('main').waitFor();await page.waitForFunction(()=>!document.body.classList.contains('is-loading'));await page.evaluate(()=>document.fonts.ready);}
@@ -233,6 +234,24 @@ test('Bridge Watch film loads independently and both players keep their own cont
     await page.locator('#bridgeFilmFrame .film-play').click();
     await page.waitForFunction(()=>!document.getElementById('cornuBridgeFilm').paused&&document.getElementById('cornuFilm').paused);
     assert.equal(requests.length,2,'Returning to a loaded film must not download it again');
+    assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+});
+
+test('Bridge Watch product film resolves from its nested page and the concise layout stays usable',async()=>{
+  const {context,page,errors}=await open('/products/',{width:390,height:844});
+  try{
+    assert.equal(await page.locator('h1').innerText(),'Bridge Watch.');
+    assert.equal(await page.locator('#productFilm').getAttribute('data-encrypted-src'),'../media/shot2.json');
+    const media=page.waitForResponse(r=>r.url()===base+'/media/shot2.json');
+    await page.locator('#productFilmFrame .film-play').click();assert.equal((await media).status(),200);
+    await page.waitForFunction(()=>{const v=document.getElementById('productFilm');return !v.paused&&v.currentTime>.1;});
+    assert.ok(await page.locator('#productFilm').evaluate(v=>v.muted&&v.playsInline));
+    await page.locator('.bw-text-link').click();
+    assert.equal(new URL(page.url()).hash,'#how');
+    await page.waitForFunction(()=>document.getElementById('productFilm').paused);
+    await fit(page,'Bridge Watch page');
+    assert.equal(await page.locator('.bw-actions a[href="../#contact"],.bw-contact a[href="../#contact"]').count(),2);
     assert.deepEqual(errors,[]);
   }finally{await context.close();}
 });
