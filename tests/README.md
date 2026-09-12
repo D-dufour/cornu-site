@@ -1,5 +1,16 @@
 # Website verification
 
+Install browser test dependencies with `npm ci` and `npx playwright install chromium`.
+Run `npm run test:website` to check the encrypted `docs/` output: decryption,
+scene rendering, pause/resume, responsive layouts, keyboard navigation,
+reduced motion, portraits, local links and contact validation. The test serves
+only `docs/` on an ephemeral loopback port and closes the server afterward.
+
+For an installed Edge browser on Windows, run
+`$env:PW_CHANNEL='msedge'; npm run test:website`. Set `CORNU_PASSWORD` when
+testing a build made with a custom password. `npm test` runs both the website
+checks and the simulation regressions below.
+
 Run the navigation regressions against the published simulation:
 
     node --test tests/navigation.test.cjs
