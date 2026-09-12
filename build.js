@@ -53,12 +53,12 @@ function inline(pageRel) {
   html = html.replace(/<link rel="icon"(?![^>]*data:)[^>]*>/,
     () => '<link rel="icon" href="data:image/svg+xml,' +
       encodeURIComponent(fs.readFileSync(path.join(SRC, 'assets/img/favicon.svg'), 'utf8').trim()) + '">');
-  html = html.replace(/src="((?:\.\.\/)*assets\/img\/(?:partners|team)\/[^"?]+\.(png|jpe?g|webp))"/gi,
+  html = html.replace(/src="((?:\.\.\/)*assets\/img\/(?:partners|team)\/[^"?]+\.(png|jpe?g))"/gi,
     (match, rel, ext) => {
       const abs = path.resolve(dir, rel);
       if (!fs.existsSync(abs)) return match;
       const data = fs.readFileSync(abs).toString('base64');
-      const mime = ext.toLowerCase() === 'webp' ? 'image/webp' : ext.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+      const mime = ext.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
       return 'src="data:' + mime + ';base64,' + data + '"';
     });
 
@@ -282,9 +282,6 @@ for (const p of pages) {
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
 fs.writeFileSync(path.join(OUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
 const simulationOut = path.join(OUT, 'simulation');
-if (path.dirname(path.resolve(simulationOut)) !== path.resolve(OUT)) {
-  throw new Error('Simulation output must be a direct child of docs/.');
-}
 fs.rmSync(simulationOut, { recursive: true, force: true });
 fs.mkdirSync(simulationOut, { recursive: true });
 fs.copyFileSync(path.join(SRC, 'simulation', 'index.html'), path.join(simulationOut, 'index.html'));
@@ -295,6 +292,7 @@ for (const s2 of sizes) {
   console.log(s2.label.padEnd(9) + ' ' + kb(s2.raw).padStart(10) +
     '  ->  ' + kb(s2.enc).padStart(10) + '   docs/' + s2.out);
 }
+console.log('password  ' + PASSWORD);
 
 console.log('\nwrote encrypted ' + sizes.map(s2 => 'docs/' + s2.out).join(', ') +
   ' and standalone docs/simulation/ — commit docs/, never source/.');

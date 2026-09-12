@@ -109,8 +109,8 @@ On Windows PowerShell:
 $env:CORNU_PASSWORD='four unrelated words here'; node build.js
 ```
 
-The build does not print the password. Assigning it directly in a shell command
-can still leave it in shell history.
+Note the password is echoed in your terminal when the build runs, and lands in
+your shell history. If that matters, clear the history line afterwards.
 
 ---
 
@@ -207,27 +207,6 @@ Note that `docs/simulation/` is published in the clear — it is copied, not
 encrypted, because it is a standalone application rather than a page of the
 site. Keep that in mind before putting anything in it you would not want
 read without the password.
-
-## Website presentation and verification
-
-The September presentation update introduces a shared spatial illustration
-for the opening, maritime and world-model sections, plus a framed waterway
-network. Text sections flow normally; desktop scene sequences use shorter
-sticky tracks. Phones, reduced-motion preferences and short viewports use
-ordinary document flow. The opening has a pause control for ambient motion;
-canvas animation stops offscreen and while the browser tab is hidden.
-
-Illustrations and network counts are explicitly labelled as illustrative.
-Contact opens an email draft rather than implying a message was sent. The
-existing encrypted preview gate and search-engine exclusion remain in place.
-
-Team portraits use appropriately sized WebP derivatives, keeping the encrypted
-homepage below 400 KB. `build.js` accepts WebP alongside PNG and JPEG. The
-original portraits remain available in the local authoring tree.
-
-Run `npm ci`, install a Playwright browser and run `npm test`. See
-`tests/README.md` for browser setup and coverage. The authoring tree remains
-ignored; changes to it must be rebuilt into `docs/` before committing.
 
 ## Simulation updates and verification
 
