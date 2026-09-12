@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CORNU — Maritime Spatial Intelligence System</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,14 +14,14 @@
 <div id="app">
 
   <header>
-    <div class="brand">
+    <a class="brand" href="../" aria-label="Cornu — return to website">
       <svg viewBox="0 0 64 64" fill="none" stroke="#C9F26E" stroke-width="5" stroke-linecap="round">
         <path d="M32 60V32"/><path d="M32 34 16 20"/><path d="M32 34 48 20"/>
         <path d="M16 20 8 7"/><path d="M16 20 23 6"/><path d="M48 20 56 7"/><path d="M48 20 41 6"/>
       </svg>
       <b>CORNU</b>
       <span class="tag">Maritime spatial intelligence</span>
-    </div>
+    </a>
 
     <div class="hdr-mid">
       <div class="seg" id="scenarios">
@@ -49,7 +49,12 @@
     </div>
   </header>
 
-  <aside class="left">
+  <nav class="mobile-panels" aria-label="Simulation information">
+    <button type="button" data-panel="vesselPanel" aria-controls="vesselPanel" aria-expanded="false">Vessel &amp; guidance</button>
+    <button type="button" data-panel="sensorPanel" aria-controls="sensorPanel" aria-expanded="false">Camera &amp; sensors</button>
+  </nav>
+
+  <aside class="left" id="vesselPanel" aria-label="Vessel and guidance">
     <div class="block">
       <h3>Own vessel</h3>
       <div class="rows" id="vesselRows"></div>
@@ -69,7 +74,7 @@
   </aside>
 
   <main>
-    <canvas id="scene"></canvas>
+    <canvas id="scene" aria-label="Interactive maritime simulation. Drag to rotate the view; tap a vessel to inspect it."></canvas>
 
     <div class="overlay-tl">
       <div class="mode">World model · active</div>
@@ -97,7 +102,7 @@
     <div id="bootError"></div>
   </main>
 
-  <aside class="right">
+  <aside class="right" id="sensorPanel" aria-label="Camera and sensors">
     <div class="block">
       <h3>Perception</h3>
       <div class="rows" id="perceptRows"></div>

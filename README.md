@@ -14,7 +14,7 @@ overlay on a static site can be skipped by opening the source — unless the pag
 content itself is encrypted.
 
 So that is what this does. Each published page — `docs/index.html` and
-`docs/products/index.html` — contains:
+`docs/products/index.html` and `docs/careers/index.html` — contains:
 
 - the unlock screen, and
 - the entire site encrypted with **AES-256-GCM**, using a key derived from your
@@ -118,17 +118,24 @@ your shell history. If that matters, clear the history line afterwards.
 
 The real site lives in `source/`. Edit it exactly as before — team members,
 copy, colours, everything (see `source/README.md`). Preview your changes by
-opening `source/index.html` or `source/products/index.html` directly in a
+opening a marketing page under `source/` directly in a
 browser; no password there.
 
-There are two pages. `source/index.html` is the home page and
-`source/products/index.html` is the Bridge Watch product page, published at
-`/products/`. Both share `source/assets/`, and both are encrypted with the
-same password, so a visitor who unlocks one can move between them without
-being asked again in that tab. To add a third page, create it under
-`source/` and add a line to the `pages` array near the bottom of
-`build.js`; asset paths are resolved relative to the page, so a page one
-directory down refers to `../assets/...`.
+`docs/careers/index.html` contains the encrypted careers page; its authoring
+copy is `source/careers/index.html`.
+
+There are three marketing pages: `source/index.html` (home),
+`source/products/index.html` (Bridge Watch), and `source/careers/index.html`
+(role descriptions and applications). They share `source/assets/` and the
+same password. An unlocked visitor can navigate between them in the same tab.
+New pages belong in the `pages` array in `build.js`.
+
+The careers form validates the applicant's details and prepares an email to
+`careers@cornu.ai`. The applicant must send that draft in their email app;
+there is no server-side submission or file storage. A copy button and selectable
+text fallback support visitors without a configured email app. Applicants can
+link to their CV or attach it to the draft. Verify the hiring mailbox before
+accepting applications. Direct submission requires a configured form service.
 
 When it looks right:
 

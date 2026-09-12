@@ -1,5 +1,20 @@
 # Website verification
 
+Install browser test dependencies with `npm ci`, then install Chromium with
+`npx playwright install chromium`. After building, run `npm test` to check
+career links, role selection, application validation and copy fallback, internal
+links, responsive layouts (320-1440 px, including landscape), keyboard menu
+behaviour, and simulation controls on a phone viewport. The tests use a local
+server and never send an application email.
+
+To use an installed Microsoft Edge browser in PowerShell:
+
+    $env:PW_CHANNEL='msedge'
+    npm test
+
+The default preview password is used unless `CORNU_PASSWORD` is set. The suite
+checks the encrypted `docs/` output, so run `npm run build` after source changes.
+
 Run the navigation regressions against the published simulation:
 
     node --test tests/navigation.test.cjs

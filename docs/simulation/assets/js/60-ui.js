@@ -23,6 +23,19 @@
   UI.prototype.build = function () {
     const app = this.app;
 
+    document.querySelectorAll('[data-panel]').forEach(button=>{
+      button.addEventListener('click',()=>{
+        const panel=document.getElementById(button.dataset.panel);
+        const open=button.getAttribute('aria-expanded')!=='true';
+        document.querySelectorAll('[data-panel]').forEach(other=>{
+          const active=other===button&&open;
+          other.setAttribute('aria-expanded',String(active));
+          document.getElementById(other.dataset.panel).classList.toggle('mobile-open',active);
+        });
+        if(open)panel.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
+      });
+    });
+
     /* --- camera + view mode --------------------------------------------- */
     this.bindGroup('#camModes', (v) => { app.renderer.camera.mode = v; });
     this.bindGroup('#viewModes', (v) => {
@@ -112,6 +125,7 @@
       }
       drag = null;
     });
+    cv.addEventListener('pointercancel',()=>{drag=null;});
     cv.addEventListener('wheel', (e) => {
       e.preventDefault();
       const o = app.renderer.camera.orbit;

@@ -110,3 +110,46 @@ footer{grid-column:1/-1;border-top:1px solid var(--line);background:var(--panel)
 @media (max-width:1100px){
   #app{grid-template-columns:200px 1fr 210px}
 }
+
+a.brand{color:inherit;text-decoration:none}
+.mobile-panels{display:none}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--signal);outline-offset:3px}
+@media(max-width:1300px){.brand .tag{display:none}}
+@media(max-width:900px){
+  html,body{height:auto;min-height:100%;overflow:auto}
+  #app{height:auto;min-height:100svh;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(380px,60svh) auto auto auto;grid-template-areas:'header' 'tabs' 'scene' 'controls' 'vessel' 'sensors'}
+  header{grid-area:header;display:grid;grid-template-columns:1fr auto;gap:14px;padding:16px 12px}
+  .hdr-right{grid-column:2;grid-row:1;gap:8px}
+  .hdr-mid{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px;min-width:0}
+  #scenarios{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .hdr-mid .seg{display:flex;min-width:0}
+  .hdr-mid #scenarios{display:grid}
+  .hdr-mid .seg button{flex:1;min-width:0;padding:8px 5px;font-size:.53rem;letter-spacing:.04em;min-height:40px}
+  .mobile-panels{grid-area:tabs;display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--line);padding:0 12px 10px;gap:8px;background:var(--panel)}
+  .mobile-panels button{min-height:44px;border:1px solid var(--line);border-radius:4px;font-family:var(--mono);font-size:.6rem;color:var(--muted)}
+  .mobile-panels button[aria-expanded=true]{color:var(--signal);border-color:var(--signal)}
+  main{grid-area:scene;min-height:380px}
+  #scene{touch-action:none}
+  aside.left{grid-area:vessel}
+  aside.right{grid-area:sensors}
+  aside.left,aside.right{display:none;border:0;max-height:70svh;border-top:1px solid var(--line)}
+  aside.mobile-open{display:block}
+  .block{padding:20px 16px}
+  .block h3{font-size:.65rem;color:var(--muted)}
+  .chk{min-height:40px;font-size:.75rem}
+  .chk input{width:18px;height:18px}
+  #camModes{display:flex}
+  #camModes button{flex:1;min-height:44px}
+  footer{grid-area:controls;display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:12px}
+  .controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  #speeds{grid-column:1/-1;display:flex}
+  #speeds button{flex:1;min-height:44px}
+  #playPause,#reset{min-height:44px}
+  #alerts{padding:0}
+  .alert{white-space:normal;align-items:flex-start;line-height:1.5;font-size:.6rem}
+  .alert .txt{overflow-wrap:anywhere}
+  .overlay-tl .mode{font-size:.5rem;letter-spacing:.1em}
+  .overlay-bl{font-size:.5rem;letter-spacing:.06em;line-height:1.7}
+  #inspector{max-width:calc(100% - 24px);right:12px;top:40px}
+  #inspectorClose{min-height:36px;min-width:36px}
+}

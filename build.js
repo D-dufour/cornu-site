@@ -53,12 +53,12 @@ function inline(pageRel) {
   html = html.replace(/<link rel="icon"(?![^>]*data:)[^>]*>/,
     () => '<link rel="icon" href="data:image/svg+xml,' +
       encodeURIComponent(fs.readFileSync(path.join(SRC, 'assets/img/favicon.svg'), 'utf8').trim()) + '">');
-  html = html.replace(/src="((?:\.\.\/)*assets\/img\/(?:partners|team)\/[^"?]+\.(png|jpe?g))"/gi,
+  html = html.replace(/src="((?:\.\.\/)*assets\/img\/(?:partners|team)\/[^"?]+\.(png|jpe?g|webp))"/gi,
     (match, rel, ext) => {
       const abs = path.resolve(dir, rel);
       if (!fs.existsSync(abs)) return match;
       const data = fs.readFileSync(abs).toString('base64');
-      const mime = ext.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+      const mime = ext.toLowerCase() === 'webp' ? 'image/webp' : ext.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
       return 'src="data:' + mime + ';base64,' + data + '"';
     });
 
@@ -266,7 +266,8 @@ fs.mkdirSync(OUT, { recursive: true });
    unlocked one page the others open without asking again in that tab. */
 const pages = [
   { src: 'index.html', out: 'index.html', label: 'site' },
-  { src: 'products/index.html', out: 'products/index.html', label: 'products' }
+  { src: 'products/index.html', out: 'products/index.html', label: 'products' },
+  { src: 'careers/index.html', out: 'careers/index.html', label: 'careers' }
 ];
 
 const sizes = [];

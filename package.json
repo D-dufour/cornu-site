@@ -1,0 +1,10 @@
+{
+  "name": "cornu-site",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "test": "node --test tests/site.test.cjs",
+    "test:navigation": "node --test tests/navigation.test.cjs"
+  },
+  "devDependencies": { "playwright": "1.63.0" }
+}
