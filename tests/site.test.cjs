@@ -56,6 +56,20 @@ test('application validates input, prepares the correct copy and handles clipboa
     await page.locator('#a-role').selectOption('perception');
     await page.locator('#a-name').fill('Test Applicant');await page.locator('#a-email').fill('applicant@example.com');
     await page.locator('#a-message').fill('I built and evaluated a vessel tracking pipeline using camera and radar data.');
+    await page.locator('#copyApplication').click();
+    assert.equal(await page.locator('#a-experience').getAttribute('aria-invalid'),'true');
+    await page.locator('#a-experience').selectOption({label:'3-5 years'});
+    await page.locator('#a-languages').fill('   ');await page.locator('#a-skills').fill('   ');
+    await page.locator('#copyApplication').click();
+    assert.equal(await page.locator('#a-languages').getAttribute('aria-invalid'),'true');
+    assert.equal(await page.locator('#a-skills').getAttribute('aria-invalid'),'true');
+    await page.locator('#a-languages').fill('Python (4 years), C++ (2 years)');
+    await page.locator('#a-skills').fill('PyTorch training, OpenCV calibration, Git and Linux.');
+    await page.locator('#a-education').fill('Robotics MSc');
+    await page.locator('#a-motivation').fill('I want to apply perception to inland waterways.');
+    await page.locator('#a-code').fill('javascript:alert(1)');await page.locator('#copyApplication').click();
+    assert.equal(await page.locator('#a-code').getAttribute('aria-invalid'),'true');
+    await page.locator('#a-code').fill('https://example.com/code');
     await page.locator('#a-profile').fill('javascript:alert(1)');await page.locator('#copyApplication').click();
     assert.equal(await page.locator('#a-profile').getAttribute('aria-invalid'),'true');
     await page.locator('#a-profile').fill('https://example.com/portfolio');
@@ -63,6 +77,7 @@ test('application validates input, prepares the correct copy and handles clipboa
     await page.locator('#copyApplication').click();
     const copied=await page.evaluate(()=>window.copiedApplication);
     assert.match(copied,/To: careers@cornu.ai/);assert.match(copied,/Perception Engineer/);assert.match(copied,/Test Applicant/);assert.match(copied,/https:\/\/example.com\/portfolio/);
+    for(const expected of ['3-5 years','Python (4 years), C++ (2 years)','PyTorch training, OpenCV calibration, Git and Linux.','Robotics MSc','https://example.com/code','I want to apply perception to inland waterways.'])assert.ok(copied.includes(expected),'Missing applicant detail: '+expected);
     assert.match(await page.locator('#applicationStatus').innerText(),/Nothing has been sent/);
     await page.evaluate(()=>{navigator.clipboard.writeText=async()=>{throw new Error('Permission denied');};});
     await page.locator('#copyApplication').click();
