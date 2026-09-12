@@ -64,8 +64,8 @@ function inline(pageRel) {
 
   html = html.replace(/poster="((?:\.\.\/)*assets\/img\/film\/[^"?]+\.jpg)"/g,
     (match, rel) => 'poster="data:image/jpeg;base64,' + fs.readFileSync(path.resolve(dir, rel)).toString('base64') + '"');
-  html = html.replace(/data-src="assets\/videos\/shot1\.mp4"/g,
-    'data-encrypted-src="media/shot1.json"');
+  html = html.replace(/data-src="assets\/videos\/(shot[12])\.mp4"/g,
+    (match, name) => 'data-encrypted-src="media/' + name + '.json"');
 
   if (/(href|src|poster)="(?:\.\.\/)*assets\//.test(html)) {
     throw new Error('Unresolved asset reference in ' + pageRel +
@@ -278,8 +278,10 @@ const pages = [
 // Keep the film behind the preview password without adding it to the page payload.
 const mediaOut = path.join(OUT, 'media');
 fs.mkdirSync(mediaOut, { recursive: true });
-fs.writeFileSync(path.join(mediaOut, 'shot1.json'),
-  JSON.stringify(encrypt(fs.readFileSync(path.join(SRC, 'assets/videos/shot1.mp4')), PASSWORD)));
+for (const name of ['shot1', 'shot2']) {
+  fs.writeFileSync(path.join(mediaOut, name + '.json'),
+    JSON.stringify(encrypt(fs.readFileSync(path.join(SRC, 'assets/videos', name + '.mp4')), PASSWORD)));
+}
 
 const sizes = [];
 for (const p of pages) {

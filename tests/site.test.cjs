@@ -213,3 +213,26 @@ test('film autoplay pauses offscreen, respects manual pause and retries a failed
     assert.deepEqual(errors,[]);
   }finally{await context.close();}
 });
+
+test('Bridge Watch film loads independently and both players keep their own controls',async()=>{
+  const {context,page,errors}=await open('/',{width:390,height:844});
+  try{
+    const requests=[];page.on('request',r=>{if(r.url().includes('/media/'))requests.push(new URL(r.url()).pathname);});
+    await page.locator('#bridgeFilmFrame').scrollIntoViewIfNeeded();
+    assert.equal(await page.locator('#cornuBridgeFilm').getAttribute('src'),null);
+    assert.equal(await page.locator('#cornuFilm').getAttribute('src'),null);
+    await page.locator('#bridgeFilmFrame .film-play').click();
+    await page.waitForFunction(()=>{const v=document.getElementById('cornuBridgeFilm');return !v.paused&&v.currentTime>.1;});
+    assert.deepEqual(requests,['/media/shot2.json']);
+    assert.equal(await page.locator('#cornuBridgeFilm').evaluate(v=>v.muted&&v.playsInline&&v.videoWidth===1920),true);
+    assert.equal(await page.locator('#cornuFilm').getAttribute('src'),null);
+    await fit(page,'Bridge Watch film');
+    await page.locator('#filmPlay').click();
+    await page.waitForFunction(()=>!document.getElementById('cornuFilm').paused&&document.getElementById('cornuBridgeFilm').paused);
+    assert.deepEqual(requests,['/media/shot2.json','/media/shot1.json']);
+    await page.locator('#bridgeFilmFrame .film-play').click();
+    await page.waitForFunction(()=>!document.getElementById('cornuBridgeFilm').paused&&document.getElementById('cornuFilm').paused);
+    assert.equal(requests.length,2,'Returning to a loaded film must not download it again');
+    assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+});

@@ -233,12 +233,14 @@ for the regression checks and playback timing options. This is a simulation
 controller using estimated dimensions and channel-following traffic forecasts.
 
 
-## Homepage film
+## Homepage films
 
-The homepage film is authored at `source/assets/videos/shot1.mp4`, with its
-poster at `source/assets/img/film/shot1.jpg`. The build encrypts the MP4 into
-`docs/media/shot1.json` using the preview password. Commit that encrypted file
-alongside the pages; keep the original MP4 and audio out of the public repo.
+The opening film uses `source/assets/videos/shot1.mp4`; the Bridge Watch
+section uses `source/assets/videos/shot2.mp4`. Their posters live in
+`source/assets/img/film/` with the same filenames and a `.jpg` extension.
+The build encrypts both MP4s into `docs/media/shot1.json` and `shot2.json`
+using the preview password. Commit those encrypted files alongside the pages;
+keep the original media out of the public repo. Each player loads independently.
 
 The film loads only when it enters view or the visitor presses play. It starts
 muted, plays inline, pauses when offscreen or in a hidden tab, and respects a
