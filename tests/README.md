@@ -33,3 +33,8 @@ SIM_STEP=0.06666666666666667.
 The local authoring tree is ignored by Git. Run node build.js after changing
 source/, then test the docs/ output before publishing. The older simulation/
 directory is an archived prototype; docs/simulation/ is the deployed app.
+
+
+Film checks cover on-demand loading after unlock, inline phone playback,
+original aspect ratio, reduced motion, offscreen and manual pause, and recovery
+from a failed media request. Playback uses the encrypted media output.

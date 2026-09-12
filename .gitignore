@@ -4,3 +4,5 @@ source/
 
 node_modules/
 .DS_Store
+# Original media uploads stay local; publish encrypted docs/media instead.
+/assets/videos/

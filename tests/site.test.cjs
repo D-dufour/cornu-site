@@ -165,3 +165,51 @@ test('new careers page stays gated; home assets and original scroll stage sizes 
     assert.deepEqual(errors,[]);
   }finally{await context.close();}
 });
+
+test('film loads on demand behind the preview gate and plays inline on a phone',async()=>{
+  const locked=await browser.newContext();
+  try{
+    const page=await locked.newPage(),media=[];page.on('request',r=>{if(r.url().includes('/media/'))media.push(r.url());});
+    await page.goto(base+'/');await page.locator('#pw').waitFor();
+    assert.equal(await page.locator('#cornuFilm').count(),0);assert.deepEqual(media,[]);
+  }finally{await locked.close();}
+  const {context,page,errors}=await open('/',{width:390,height:844});
+  try{
+    const requests=[];page.on('request',r=>{if(r.url().includes('/media/'))requests.push(r.url());});
+    await jump(page,'#film');
+    assert.equal(await page.locator('#cornuFilm').getAttribute('src'),null);
+    assert.deepEqual(requests,[],'Reduced motion must wait for a play request');
+    await page.locator('#filmPlay').click();
+    await page.waitForFunction(()=>{const v=document.getElementById('cornuFilm');return !v.paused&&v.currentTime>.1;});
+    assert.equal(requests.length,1);
+    assert.equal(await page.locator('#cornuFilm').evaluate(v=>v.muted&&v.playsInline&&v.videoWidth===1920),true);
+    await fit(page,'Phone film');
+    const r=await page.locator('#cornuFilm').boundingBox();assert.ok(Math.abs(r.width/r.height-16/9)<.02,'Film keeps its original aspect ratio');
+    await jump(page,'#company');await page.waitForFunction(()=>document.getElementById('cornuFilm').paused);
+    await jump(page,'#film');assert.equal(await page.locator('#cornuFilm').evaluate(v=>v.paused),true);
+    assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+});
+
+test('film autoplay pauses offscreen, respects manual pause and retries a failed load',async()=>{
+  const {context,page,errors}=await open();
+  try{
+    await page.emulateMedia({reducedMotion:'no-preference'});
+    await page.locator('#cornuFilm').evaluate(e=>e.scrollIntoView({behavior:'instant',block:'center'}));
+    await page.waitForFunction(()=>{const v=document.getElementById('cornuFilm');return !v.paused&&v.currentTime>.1;});
+    await page.locator('#company').evaluate(e=>e.scrollIntoView({behavior:'instant'}));
+    await page.waitForFunction(()=>document.getElementById('cornuFilm').paused);
+    await page.locator('#cornuFilm').evaluate(e=>e.scrollIntoView({behavior:'instant',block:'center'}));
+    await page.waitForFunction(()=>!document.getElementById('cornuFilm').paused);
+    await page.locator('#cornuFilm').evaluate(v=>v.pause());await page.waitForTimeout(100);
+    await page.locator('#company').evaluate(e=>e.scrollIntoView({behavior:'instant'}));await page.waitForTimeout(100);
+    await page.locator('#cornuFilm').evaluate(e=>e.scrollIntoView({behavior:'instant',block:'center'}));await page.waitForTimeout(200);
+    assert.equal(await page.locator('#cornuFilm').evaluate(v=>v.paused),true,'Scrolling back must respect a manual pause');
+    await page.emulateMedia({reducedMotion:'reduce'});await ready(page,'/');
+    await page.route('**/media/shot1.json',r=>r.abort());
+    await page.locator('#filmPlay').click();await page.waitForFunction(()=>document.getElementById('filmStatus').textContent.includes('could not load'));
+    await page.unroute('**/media/shot1.json');await page.locator('#filmPlay').click();
+    await page.waitForFunction(()=>!document.getElementById('cornuFilm').paused);
+    assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+});

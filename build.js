@@ -62,7 +62,12 @@ function inline(pageRel) {
       return 'src="data:' + mime + ';base64,' + data + '"';
     });
 
-  if (/(href|src)="(?:\.\.\/)*assets\//.test(html)) {
+  html = html.replace(/poster="((?:\.\.\/)*assets\/img\/film\/[^"?]+\.jpg)"/g,
+    (match, rel) => 'poster="data:image/jpeg;base64,' + fs.readFileSync(path.resolve(dir, rel)).toString('base64') + '"');
+  html = html.replace(/data-src="assets\/videos\/shot1\.mp4"/g,
+    'data-encrypted-src="media/shot1.json"');
+
+  if (/(href|src|poster)="(?:\.\.\/)*assets\//.test(html)) {
     throw new Error('Unresolved asset reference in ' + pageRel +
       ' — every asset must be inlined before encrypting.');
   }
@@ -269,6 +274,12 @@ const pages = [
   { src: 'products/index.html', out: 'products/index.html', label: 'products' },
   { src: 'careers/index.html', out: 'careers/index.html', label: 'careers' }
 ];
+
+// Keep the film behind the preview password without adding it to the page payload.
+const mediaOut = path.join(OUT, 'media');
+fs.mkdirSync(mediaOut, { recursive: true });
+fs.writeFileSync(path.join(mediaOut, 'shot1.json'),
+  JSON.stringify(encrypt(fs.readFileSync(path.join(SRC, 'assets/videos/shot1.mp4')), PASSWORD)));
 
 const sizes = [];
 for (const p of pages) {
