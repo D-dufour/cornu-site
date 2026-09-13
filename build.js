@@ -64,7 +64,7 @@ function inline(pageRel) {
 
   html = html.replace(/poster="((?:\.\.\/)*assets\/img\/film\/[^"?]+\.jpg)"/g,
     (match, rel) => 'poster="data:image/jpeg;base64,' + fs.readFileSync(path.resolve(dir, rel)).toString('base64') + '"');
-  html = html.replace(/data-src="((?:\.\.\/)*)assets\/videos\/(shot[12])\.mp4"/g,
+  html = html.replace(/data-src="((?:\.\.\/)*)assets\/videos\/(shot[123])\.mp4"/g,
     (match, prefix, name) => 'data-encrypted-src="' + prefix + 'media/' + name + '.json"');
 
   if (/(href|src|poster)="(?:\.\.\/)*assets\//.test(html)) {
@@ -278,7 +278,7 @@ const pages = [
 // Keep the film behind the preview password without adding it to the page payload.
 const mediaOut = path.join(OUT, 'media');
 fs.mkdirSync(mediaOut, { recursive: true });
-for (const name of ['shot1', 'shot2']) {
+for (const name of ['shot1', 'shot2', 'shot3']) {
   fs.writeFileSync(path.join(mediaOut, name + '.json'),
     JSON.stringify(encrypt(fs.readFileSync(path.join(SRC, 'assets/videos', name + '.mp4')), PASSWORD)));
 }

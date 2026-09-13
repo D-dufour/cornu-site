@@ -215,7 +215,7 @@ test('film autoplay pauses offscreen, respects manual pause and retries a failed
   }finally{await context.close();}
 });
 
-test('Bridge Watch film loads independently and both players keep their own controls',async()=>{
+test('Homepage films load independently and keep separate controls',async()=>{
   const {context,page,errors}=await open('/',{width:390,height:844});
   try{
     const requests=[];page.on('request',r=>{if(r.url().includes('/media/'))requests.push(new URL(r.url()).pathname);});
@@ -234,6 +234,12 @@ test('Bridge Watch film loads independently and both players keep their own cont
     await page.locator('#bridgeFilmFrame .film-play').click();
     await page.waitForFunction(()=>!document.getElementById('cornuBridgeFilm').paused&&document.getElementById('cornuFilm').paused);
     assert.equal(requests.length,2,'Returning to a loaded film must not download it again');
+    await page.locator('#worldmodelFilmFrame .film-play').click();
+    await page.waitForFunction(()=>{const v=document.getElementById('worldmodelFilm');return !v.paused&&v.currentTime>.1&&document.getElementById('cornuBridgeFilm').paused;});
+    assert.deepEqual(requests,['/media/shot2.json','/media/shot1.json','/media/shot3.json']);
+    assert.ok(await page.locator('#worldmodelFilm').evaluate(v=>v.muted&&v.playsInline&&v.videoWidth===1920));
+    await fit(page,'World model film');
+    await page.locator('#simulation').scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.getElementById('worldmodelFilm').paused);
     assert.deepEqual(errors,[]);
   }finally{await context.close();}
 });

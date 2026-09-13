@@ -236,9 +236,10 @@ controller using estimated dimensions and channel-following traffic forecasts.
 ## Homepage films
 
 The opening film uses `source/assets/videos/shot1.mp4`; the Bridge Watch
-section uses `source/assets/videos/shot2.mp4`. Their posters live in
+section uses `source/assets/videos/shot2.mp4`. The world-model film, after
+the scroll-driven model section, uses `source/assets/videos/shot3.mp4`. Their posters live in
 `source/assets/img/film/` with the same filenames and a `.jpg` extension.
-The build encrypts both MP4s into `docs/media/shot1.json` and `shot2.json`
+The build encrypts the MP4s into `docs/media/shot1.json`, `shot2.json` and `shot3.json`
 using the preview password. Commit those encrypted files alongside the pages;
 keep the original media out of the public repo. Each player loads independently.
 
