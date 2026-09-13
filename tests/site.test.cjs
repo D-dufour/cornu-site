@@ -24,7 +24,7 @@ async function open(url='/',viewport={width:1440,height:1000}){
   page.on('console',m=>{if(m.type()==='error'&&m.text().startsWith('Cornu:'))errors.push(m.text());});
   await ready(page,url);return {context,page,errors};
 }
-async function ready(page,url){await page.goto(base+url);await page.locator('main').waitFor();await page.waitForFunction(()=>!document.body.classList.contains('is-loading'));await page.evaluate(()=>document.fonts.ready);}
+async function ready(page,url){await page.goto(base+url);await page.locator(url.startsWith('/simulation/')?'#scene':'#nav').waitFor();await page.waitForFunction(()=>!document.body.classList.contains('is-loading'));await page.evaluate(()=>document.fonts.ready);}
 async function jump(page,selector){await page.locator(selector).scrollIntoViewIfNeeded();await page.waitForTimeout(80);}
 async function fit(page,label){assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),label+' has horizontal overflow');}
 
