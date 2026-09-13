@@ -38,3 +38,7 @@ directory is an archived prototype; docs/simulation/ is the deployed app.
 Film checks cover on-demand loading after unlock, inline phone playback,
 original aspect ratio, reduced motion, offscreen and manual pause, and recovery
 from a failed media request. Playback uses the encrypted media output.
+
+Launch checks also cover contact enquiry validation/copy fallback, direct
+simulation access requiring the preview password, keyboard skip links, unique
+IDs and form labels. See LAUNCH-READINESS.md for external launch prerequisites.

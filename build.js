@@ -171,7 +171,8 @@ function gate(p) {
       <input id="pw" type="password" placeholder="Password" aria-label="Password" autofocus>
       <button id="go" type="submit">Enter</button>
     </form>
-    <p class="msg" id="msg"></p>
+    <p class="msg" id="msg" role="status" aria-live="polite"></p>
+    <noscript><p class="note">Enable JavaScript to unlock this preview.</p></noscript>
   </main>
 
 <script>
@@ -298,7 +299,11 @@ fs.writeFileSync(path.join(OUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
 const simulationOut = path.join(OUT, 'simulation');
 fs.rmSync(simulationOut, { recursive: true, force: true });
 fs.mkdirSync(simulationOut, { recursive: true });
-fs.copyFileSync(path.join(SRC, 'simulation', 'index.html'), path.join(simulationOut, 'index.html'));
+// The standalone application shares the same preview gate. Its existing external
+// scripts still load in parser order after unlock and receive DOMContentLoaded.
+const simulationHtml = fs.readFileSync(path.join(SRC, 'simulation', 'index.html'), 'utf8');
+const simulationBundle = JSON.stringify({ h: simulationHtml, j: '' });
+fs.writeFileSync(path.join(simulationOut, 'index.html'), gate(encrypt(simulationBundle, PASSWORD)));
 copyTree(path.join(SRC, 'simulation', 'assets'), path.join(simulationOut, 'assets'));
 
 const kb = n => (n / 1024).toFixed(1) + ' KB';
@@ -309,4 +314,4 @@ for (const s2 of sizes) {
 console.log('password  ' + PASSWORD);
 
 console.log('\nwrote encrypted ' + sizes.map(s2 => 'docs/' + s2.out).join(', ') +
-  ' and standalone docs/simulation/ — commit docs/, never source/.');
+  ' and protected docs/simulation/ — commit docs/, never source/.');

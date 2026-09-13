@@ -261,3 +261,52 @@ test('Bridge Watch product film resolves from its nested page and the concise la
     assert.deepEqual(errors,[]);
   }finally{await context.close();}
 });
+
+test('contact enquiry validates details, preserves the draft and offers a copy fallback',async()=>{
+  const {context,page,errors}=await open('/',{width:390,height:844});
+  try{
+    await page.locator('#copyEnquiry').click();
+    assert.equal(await page.locator('#f-name').getAttribute('aria-invalid'),'true');
+    await page.locator('#f-name').fill('Preview Operator');await page.locator('#f-email').fill('operator@example.com');
+    await page.locator('#f-org').fill('Example Fleet');await page.locator('#f-msg').fill('We would like to discuss a Bridge Watch pilot on our inland vessel.');
+    await page.locator('#f-fleet').fill('-2');await page.locator('#copyEnquiry').click();
+    assert.equal(await page.locator('#f-fleet').getAttribute('aria-invalid'),'true');
+    await page.locator('#f-fleet').fill('12');
+    await page.locator('.path[data-interest="Shipyard"]').click();assert.equal(await page.locator('#f-interest').inputValue(),'Shipyard');
+    await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>window.enquiryDraft=text}}));
+    await page.locator('#copyEnquiry').click();const draft=await page.evaluate(()=>window.enquiryDraft);
+    for(const value of ['To: hello@cornu.ai','Preview Operator','operator@example.com','Example Fleet','Role: Shipyard','Vessels in fleet: 12','Bridge Watch pilot'])assert.ok(draft.includes(value));
+    assert.match(await page.locator('#formStatus').innerText(),/Nothing has been sent/);
+    await page.evaluate(()=>{navigator.clipboard.writeText=async()=>{throw new Error('Denied');};});
+    await page.locator('#copyEnquiry').click();assert.equal(await page.locator('#enquiryText').inputValue(),draft);
+    assert.equal(await page.evaluate(()=>document.activeElement.id),'enquiryText');await fit(page,'Contact form fallback');
+    assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+});
+
+test('simulation cannot open directly without the preview password and starts after unlock',async()=>{
+  const context=await browser.newContext({viewport:{width:390,height:844}});
+  try{
+    const page=await context.newPage(),requests=[],errors=[];
+    page.on('request',r=>{if(r.url().includes('/simulation/assets/'))requests.push(r.url());});
+    page.on('pageerror',e=>errors.push(e.message));
+    await page.goto(base+'/simulation/');await page.locator('#pw').waitFor();
+    assert.equal(await page.locator('#scene').count(),0);assert.deepEqual(requests,[]);
+    await page.locator('#pw').fill(process.env.CORNU_PASSWORD||'cornu2026!');await page.locator('#go').click();
+    await page.waitForFunction(()=>document.querySelector('#vesselRows')?.children.length>0);
+    assert.equal(await page.locator('#scene').isVisible(),true);assert.ok(requests.length>0);assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+});
+
+test('marketing pages expose one main landmark, unique IDs and a working keyboard skip link',async()=>{
+  const {context,page}=await open();
+  try{
+    for(const url of ['/','/products/','/careers/']){
+      await ready(page,url);assert.equal(await page.locator('main').count(),1);assert.equal(await page.locator('h1').count(),1);
+      const ids=await page.locator('[id]').evaluateAll(es=>es.map(e=>e.id));assert.equal(new Set(ids).size,ids.length,url+' has duplicate IDs');
+      await page.locator('.skip-link').focus();await page.keyboard.press('Enter');
+      assert.equal(await page.evaluate(()=>document.activeElement.id),'top');
+      const unlabelled=await page.locator('input,select,textarea').evaluateAll(es=>es.filter(e=>!e.labels?.length&&!e.getAttribute('aria-label')).map(e=>e.id));assert.deepEqual(unlabelled,[]);
+    }
+  }finally{await context.close();}
+});

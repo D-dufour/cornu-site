@@ -199,7 +199,7 @@ public. It solves a different problem than the one you asked about.
 │   ├── index.html         unlock screen + encrypted home page
 │   ├── products/
 │   │   └── index.html     unlock screen + encrypted Bridge Watch page
-│   ├── simulation/        the interactive simulation, not encrypted
+│   ├── simulation/        password-protected simulation entry page
 │   ├── robots.txt
 │   └── .nojekyll
 ├── source/                the real site, unencrypted (never commit)
@@ -210,10 +210,9 @@ public. It solves a different problem than the one you asked about.
 └── .gitignore             keeps source/ out of the repo
 ```
 
-Note that `docs/simulation/` is published in the clear — it is copied, not
-encrypted, because it is a standalone application rather than a page of the
-site. Keep that in mind before putting anything in it you would not want
-read without the password.
+The simulation entry page now uses the same encrypted preview gate as the
+marketing pages. Its JavaScript and CSS remain ordinary public supporting
+assets; this gate protects the preview entry page, not the source code.
 
 ## Simulation updates and verification
 
@@ -247,3 +246,11 @@ The film loads only when it enters view or the visitor presses play. It starts
 muted, plays inline, pauses when offscreen or in a hidden tab, and respects a
 manual pause. Reduced-motion and data-saving preferences disable autoplay.
 Native controls provide seeking, sound and fullscreen playback.
+
+
+## Contact enquiries
+
+The contact form validates required details and prepares a draft to
+`hello@cornu.ai`, with copy and selectable-text fallbacks. The visitor must
+send the email to finish. There is no backend submission or data storage.
+See `LAUNCH-READINESS.md` for the latest checks and remaining launch items.
