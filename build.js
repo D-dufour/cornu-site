@@ -1,317 +1,90 @@
 #!/usr/bin/env node
-/**
- * Cornu — build a password-protected single file for static hosting.
- *
- *   node build.js
- *   CORNU_PASSWORD='some other password' node build.js
- *
- * Reads  ./source/   (the real site — never commit this to a public repo)
- * Writes ./docs/index.html      (gate + AES-256-GCM ciphertext of the whole site)
- *
- * The published file contains no readable markup. The password is not stored
- * anywhere in it — only a random salt, a random IV and the ciphertext.
- */
-
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-
-const PASSWORD = process.env.CORNU_PASSWORD || 'cornu2026!';
-const ITERATIONS = 310000;           // PBKDF2-SHA256 rounds
+// Build public static files locally. The hosting server does not need Node.js.
+const fs = require('node:fs');
+const path = require('node:path');
 const SRC = path.join(__dirname, 'source');
 const OUT = path.join(__dirname, 'docs');
+const site = new URL(process.env.CORNU_SITE_URL || 'https://cornu.ai/');
+if (site.protocol !== 'https:' || site.username || site.password || site.search || site.hash) {
+  throw new Error('CORNU_SITE_URL must be an HTTPS website URL without credentials, query or fragment.');
+}
+if (!site.pathname.endsWith('/')) site.pathname += '/';
+const pages = ['index.html', 'products/index.html', 'careers/index.html', 'simulation/index.html'];
+const films = ['shot1', 'shot2', 'shot3'];
+const escapeAttribute = value => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
-/* ---------- 1. inline a page into one document ----------
-   Pages may sit at the root of source/ or a directory below it, so asset
-   references are resolved relative to the page itself ("assets/..." from
-   index.html, "../assets/..." from products/index.html) rather than assumed
-   to be at a fixed depth. */
-function inline(pageRel) {
-  const file = path.join(SRC, pageRel);
-  const dir = path.dirname(file);
-  let html = fs.readFileSync(file, 'utf8');
-  const read = (rel) => fs.readFileSync(path.resolve(dir, rel), 'utf8');
+function publicMetadata(html, page) {
+  const url = escapeAttribute(new URL(page.replace(/index\.html$/, ''), site).href);
+  html = html.replace(/<meta name="robots"[^>]*>\s*/g, '');
+  return html.replace('</head>',
+    '<meta name="robots" content="index, follow">\n' +
+    '<link rel="canonical" href="' + url + '">\n' +
+    '<meta property="og:url" content="' + url + '">\n</head>');
+}
 
-  /* Comments are for whoever edits source/, not for whoever reads the
-     published page. Stripping them here means section markers and any
-     authoring notes left in the markup never ship, and nobody has to
-     remember to take them out before a build.
-
-     This runs before the CSS and JS are inlined: afterwards the document
-     contains a script, and an HTML-level strip could mangle a "-->" that
-     happened to appear inside it. */
-  html = html.replace(/<!--[\s\S]*?-->/g, '');
-
-  /* replacement FUNCTIONS, not strings — a literal replacement would treat
-     "$" in the source (e.g. the $ query helper) as an escaped dollar */
+// Preserve the existing bundled layout and optimised images. Videos stay separate
+// so browsers can load them on demand and seek using normal HTTP range requests.
+function marketingPage(page) {
+  const dir = path.dirname(path.join(SRC, page));
+  const read = rel => fs.readFileSync(path.resolve(dir, rel), 'utf8');
+  let html = fs.readFileSync(path.join(SRC, page), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
   html = html.replace(/<link rel="stylesheet" href="((?:\.\.\/)*assets\/css\/cornu\.css)">/,
-    (m, rel) => '<style>\n' + read(rel) + '\n</style>');
+    (match, rel) => '<style>\n' + read(rel) + '\n</style>');
   html = html.replace(/<script src="((?:\.\.\/)*assets\/js\/cornu\.js)"[^>]*><\/script>/,
-    (m, rel) => '<script>\n' + read(rel) + '\n</script>');
+    (match, rel) => {
+      const script = read(rel);
+      new Function(script);
+      return '<script>\n' + script + '\n</script>';
+    });
   html = html.replace(/<link rel="icon"[^>]*href="((?:\.\.\/)*assets\/img\/favicon\.svg)"[^>]*>/,
-    (m, rel) => '<link rel="icon" href="data:image/svg+xml,' + encodeURIComponent(read(rel).trim()) + '">');
-  html = html.replace(/<link rel="icon"(?![^>]*data:)[^>]*>/,
-    () => '<link rel="icon" href="data:image/svg+xml,' +
-      encodeURIComponent(fs.readFileSync(path.join(SRC, 'assets/img/favicon.svg'), 'utf8').trim()) + '">');
+    (match, rel) => '<link rel="icon" href="data:image/svg+xml,' + encodeURIComponent(read(rel).trim()) + '">');
   html = html.replace(/src="((?:\.\.\/)*assets\/img\/(?:partners|team)\/[^"?]+\.(png|jpe?g|webp))"/gi,
     (match, rel, ext) => {
-      const abs = path.resolve(dir, rel);
-      if (!fs.existsSync(abs)) return match;
-      const data = fs.readFileSync(abs).toString('base64');
       const mime = ext.toLowerCase() === 'webp' ? 'image/webp' : ext.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
-      return 'src="data:' + mime + ';base64,' + data + '"';
+      return 'src="data:' + mime + ';base64,' + fs.readFileSync(path.resolve(dir, rel)).toString('base64') + '"';
     });
-
   html = html.replace(/poster="((?:\.\.\/)*assets\/img\/film\/[^"?]+\.jpg)"/g,
     (match, rel) => 'poster="data:image/jpeg;base64,' + fs.readFileSync(path.resolve(dir, rel)).toString('base64') + '"');
   html = html.replace(/data-src="((?:\.\.\/)*)assets\/videos\/(shot[123])\.mp4"/g,
-    (match, prefix, name) => 'data-encrypted-src="' + prefix + 'media/' + name + '.json"');
-
+    (match, prefix, name) => 'data-src="' + prefix + 'media/' + name + '.mp4"');
   if (/(href|src|poster)="(?:\.\.\/)*assets\//.test(html)) {
-    throw new Error('Unresolved asset reference in ' + pageRel +
-      ' — every asset must be inlined before encrypting.');
+    throw new Error('Unresolved asset reference in ' + page);
   }
-  return html;
+  // Keep public content readable when JavaScript is disabled.
+  html = html.replace('</head>', '<noscript><style>' +
+    '#loader{display:none}body.is-loading{overflow:auto}' +
+    '.rv,.flow-step,.chip{opacity:1!important;transform:none!important}' +
+    '.film-play,form{display:none}' +
+    '</style></noscript>\n</head>');
+  html = html.replace(/<form\b/g, '<noscript><p>Please enable JavaScript to use this form, or email ' +
+    (page.startsWith('careers/') ? '<a href="mailto:careers@cornu.ai">careers@cornu.ai</a>' : '<a href="mailto:hello@cornu.ai">hello@cornu.ai</a>') +
+    '.</p></noscript>\n<form');
+  return publicMetadata(html, page);
 }
 
-function copyTree(src, dest) {
-  fs.mkdirSync(dest, { recursive: true });
-  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const from = path.join(src, entry.name);
-    const to = path.join(dest, entry.name);
-    if (entry.isDirectory()) copyTree(from, to);
-    else fs.copyFileSync(from, to);
-  }
+// Prepare pages and check inputs before replacing any published files.
+const output = pages.map(page => ({page, html: page.startsWith('simulation/')
+  ? publicMetadata(fs.readFileSync(path.join(SRC, page), 'utf8'), page)
+  : marketingPage(page)}));
+for (const film of films) fs.accessSync(path.join(SRC, 'assets/videos', film + '.mp4'));
+fs.mkdirSync(path.join(OUT, 'media'), {recursive: true});
+for (const {page, html} of output) {
+  const dest = path.join(OUT, page);
+  fs.mkdirSync(path.dirname(dest), {recursive: true});
+  fs.writeFileSync(dest, html);
+  console.log('docs/' + page + ' (' + (Buffer.byteLength(html) / 1024).toFixed(1) + ' KB)');
 }
-
-function bundleDocument(html, label) {
-  const m = html.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/i);
-  if (!m) throw new Error('Could not find the ' + label + ' script — check the inline step.');
-  try { new Function(m[1]); } catch (e) {
-    throw new Error('The ' + label + ' script does not compile after inlining: ' + e.message);
-  }
-  return JSON.stringify({ h: html.replace(m[0], () => '</body>'), j: m[1] });
+for (const film of films) {
+  fs.copyFileSync(path.join(SRC, 'assets/videos', film + '.mp4'), path.join(OUT, 'media', film + '.mp4'));
+  // Remove only the known generated preview payloads, never authoring files.
+  fs.rmSync(path.join(OUT, 'media', film + '.json'), {force: true});
 }
-
-/* ---------- 2. encrypt ---------- */
-function encrypt(plaintext, password) {
-  const salt = crypto.randomBytes(16);
-  const iv = crypto.randomBytes(12);
-  const key = crypto.pbkdf2Sync(password, salt, ITERATIONS, 32, 'sha256');
-  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-  const body = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const payload = Buffer.concat([body, cipher.getAuthTag()]); // WebCrypto expects tag appended
-  return {
-    salt: salt.toString('base64'),
-    iv: iv.toString('base64'),
-    ct: payload.toString('base64'),
-    iterations: ITERATIONS
-  };
-}
-
-/* ---------- 3. the gate ---------- */
-function gate(p) {
-  return `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
-<title>Cornu</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23050706'/%3E%3Cg fill='none' stroke='%23C9F26E' stroke-width='4' stroke-linecap='round'%3E%3Cpath d='M32 56V30'/%3E%3Cpath d='M32 34 18 22'/%3E%3Cpath d='M32 34 46 22'/%3E%3Cpath d='M18 22 12 10'/%3E%3Cpath d='M18 22 24 12'/%3E%3Cpath d='M46 22 52 10'/%3E%3Cpath d='M46 22 40 12'/%3E%3C/g%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  :root{--carbon:#050706;--white:#F5F6F2;--muted:#79877D;--muted-2:#5A665E;--signal:#C9F26E;--ink:#0A0C0A;
-        --ease:cubic-bezier(.22,.61,.36,1)}
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%}
-  body{background:var(--carbon);color:var(--white);
-       font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;
-       display:grid;place-items:center;padding:24px;-webkit-font-smoothing:antialiased}
-  .gate{width:100%;max-width:340px;text-align:center}
-  svg{width:56px;height:56px;margin:0 auto}
-  svg path{stroke:var(--signal);fill:none;stroke-width:5;stroke-linecap:round;
-    stroke-dasharray:var(--len,420);stroke-dashoffset:var(--len,420);animation:draw .6s var(--ease) forwards}
-  @keyframes draw{to{stroke-dashoffset:0}}
-  .wm{font-family:"Archivo",Helvetica,Arial,sans-serif;font-weight:600;font-size:1rem;
-      letter-spacing:.42em;text-indent:.42em;margin-top:22px}
-  .note{font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-2);
-        margin-top:14px;line-height:1.9}
-  form{margin-top:34px;display:flex;flex-direction:column;gap:12px}
-  input{background:transparent;border:0;border-bottom:1px solid rgba(245,246,242,.18);
-        color:var(--white);font:inherit;font-size:.95rem;letter-spacing:.06em;
-        padding:12px 0;text-align:center;border-radius:0;transition:border-color .3s var(--ease)}
-  input::placeholder{color:var(--muted-2);letter-spacing:.2em;font-size:.68rem;text-transform:uppercase}
-  input:focus{outline:none;border-bottom-color:var(--signal)}
-  button{background:var(--signal);color:var(--ink);border:0;border-radius:999px;
-         font:inherit;font-size:.68rem;font-weight:500;letter-spacing:.18em;text-transform:uppercase;
-         padding:14px 20px;cursor:pointer;transition:background .3s var(--ease)}
-  button:hover{background:#D9FA8C}
-  button:disabled{background:#3A4239;color:var(--muted-2);cursor:default}
-  .msg{font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted-2);
-       min-height:1.4em;margin-top:6px}
-  .msg.bad{color:#E0705F}
-  .bad-shake{animation:shake .3s var(--ease)}
-  @keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
-  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}
-    svg path{stroke-dashoffset:0}}
-</style>
-</head>
-<body>
-  <main class="gate">
-    <svg viewBox="0 0 64 64" aria-hidden="true">
-      <path d="M32 60V32"/><path d="M32 34 16 20"/><path d="M32 34 48 20"/>
-      <path d="M16 20 8 7"/><path d="M16 20 23 6"/><path d="M48 20 56 7"/><path d="M48 20 41 6"/>
-    </svg>
-    <div class="wm">CORNU</div>
-    <p class="note">Not public yet.<br>Enter the password to continue.</p>
-    <form id="f" autocomplete="off">
-      <input id="pw" type="password" placeholder="Password" aria-label="Password" autofocus>
-      <button id="go" type="submit">Enter</button>
-    </form>
-    <p class="msg" id="msg" role="status" aria-live="polite"></p>
-    <noscript><p class="note">Enable JavaScript to unlock this preview.</p></noscript>
-  </main>
-
-<script>
-(function(){
-  var D = {salt:"${p.salt}", iv:"${p.iv}", ct:"${p.ct}", it:${p.iterations}};
-  var f=document.getElementById('f'), pw=document.getElementById('pw'),
-      go=document.getElementById('go'), msg=document.getElementById('msg');
-
-  function b64(s){var b=atob(s),u=new Uint8Array(b.length);
-    for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;}
-
-  async function open(password){
-    var enc=new TextEncoder();
-    var base=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveKey']);
-    var key=await crypto.subtle.deriveKey(
-      {name:'PBKDF2',salt:b64(D.salt),iterations:D.it,hash:'SHA-256'},
-      base,{name:'AES-GCM',length:256},false,['decrypt']);
-    var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(D.iv)},key,b64(D.ct));
-    return new TextDecoder().decode(plain);
-  }
-
-  function render(text){
-    var o = JSON.parse(text);
-    document.open();
-    document.write(o.h);
-    document.close();
-    /* run the site's script in its own task, and in function scope, so the
-       rewritten document's parser cannot also evaluate it */
-    setTimeout(function(){
-      try { new Function(o.j)(); }
-      catch (err) { console.error('Cornu: site script failed', err); }
-      jumpToHash();
-    }, 0);
-  }
-
-  /* A link from one page to an anchor on another — products/ back to
-     /#technology — arrives with a fragment the browser has already given up
-     on, because the document it names did not exist at load time. The site
-     also holds scrolling while the loader runs, so the jump waits for that
-     to finish rather than fighting it. */
-  function jumpToHash(){
-    if(!location.hash || location.hash.length < 2) return;
-    var target;
-    try { target = document.querySelector(location.hash); } catch(e) { return; }
-    if(!target) return;
-    var tries = 0;
-    (function go(){
-      var busy = document.body && document.body.classList.contains('is-loading');
-      if(busy && tries++ < 60){ setTimeout(go, 60); return; }
-      try { target.scrollIntoView(); } catch(e) { }
-    })();
-  }
-
-  async function attempt(password, quiet){
-    go.disabled=true; msg.className='msg'; msg.textContent=quiet?'':'Unlocking…';
-    try{
-      var html=await open(password);
-      try{ sessionStorage.setItem('cornu.k',password); }catch(e){}
-      render(html);
-    }catch(e){
-      go.disabled=false;
-      if(quiet){ msg.textContent=''; return; }
-      msg.className='msg bad'; msg.textContent='Wrong password.';
-      pw.value=''; pw.focus();
-      document.querySelector('.gate').classList.add('bad-shake');
-      setTimeout(function(){document.querySelector('.gate').classList.remove('bad-shake');},320);
-    }
-  }
-
-  f.addEventListener('submit',function(e){ e.preventDefault();
-    if(pw.value) attempt(pw.value,false); });
-
-  document.querySelectorAll('svg path').forEach(function(p,i){
-    var l=p.getTotalLength(); p.style.setProperty('--len',l);
-    p.style.animationDelay=[0,.28,.28,.52,.58,.52,.58][i]+'s';
-  });
-
-  if(!(window.crypto&&crypto.subtle)){
-    msg.className='msg bad';
-    msg.textContent='This browser cannot decrypt the page. Use a current browser over https.';
-    go.disabled=true;
-  } else {
-    var saved=null; try{ saved=sessionStorage.getItem('cornu.k'); }catch(e){}
-    if(saved) attempt(saved,true);
-  }
-})();
-</script>
-</body>
-</html>`;
-}
-
-/* ---------- run ---------- */
-fs.mkdirSync(OUT, { recursive: true });
-
-/* Every page goes behind the same gate, encrypted with the same password.
-   The gate stores the password in sessionStorage, so once a visitor has
-   unlocked one page the others open without asking again in that tab. */
-const pages = [
-  { src: 'index.html', out: 'index.html', label: 'site' },
-  { src: 'products/index.html', out: 'products/index.html', label: 'products' },
-  { src: 'careers/index.html', out: 'careers/index.html', label: 'careers' }
-];
-
-// Keep the film behind the preview password without adding it to the page payload.
-const mediaOut = path.join(OUT, 'media');
-fs.mkdirSync(mediaOut, { recursive: true });
-for (const name of ['shot1', 'shot2', 'shot3']) {
-  fs.writeFileSync(path.join(mediaOut, name + '.json'),
-    JSON.stringify(encrypt(fs.readFileSync(path.join(SRC, 'assets/videos', name + '.mp4')), PASSWORD)));
-}
-
-const sizes = [];
-for (const p of pages) {
-  const bundle = bundleDocument(inline(p.src), p.label);
-  const dest = path.join(OUT, p.out);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.writeFileSync(dest, gate(encrypt(bundle, PASSWORD)));
-  sizes.push({ label: p.label, out: p.out, raw: Buffer.byteLength(bundle),
-               enc: fs.statSync(dest).size });
-}
-
+fs.cpSync(path.join(SRC, 'simulation/assets'), path.join(OUT, 'simulation/assets'), {recursive: true});
+const sitemap = new URL('sitemap.xml', site).href;
+fs.writeFileSync(path.join(OUT, 'robots.txt'), 'User-agent: *\nAllow: /\n\nSitemap: ' + sitemap + '\n');
+fs.writeFileSync(path.join(OUT, 'sitemap.xml'), '<?xml version="1.0" encoding="UTF-8"?>\n' +
+  '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+  pages.map(page => '  <url><loc>' + escapeAttribute(new URL(page.replace(/index\.html$/, ''), site).href) + '</loc></url>').join('\n') +
+  '\n</urlset>\n');
 fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
-fs.writeFileSync(path.join(OUT, 'robots.txt'), 'User-agent: *\nDisallow: /\n');
-const simulationOut = path.join(OUT, 'simulation');
-fs.rmSync(simulationOut, { recursive: true, force: true });
-fs.mkdirSync(simulationOut, { recursive: true });
-// The standalone application shares the same preview gate. Its existing external
-// scripts still load in parser order after unlock and receive DOMContentLoaded.
-const simulationHtml = fs.readFileSync(path.join(SRC, 'simulation', 'index.html'), 'utf8');
-const simulationBundle = JSON.stringify({ h: simulationHtml, j: '' });
-fs.writeFileSync(path.join(simulationOut, 'index.html'), gate(encrypt(simulationBundle, PASSWORD)));
-copyTree(path.join(SRC, 'simulation', 'assets'), path.join(simulationOut, 'assets'));
-
-const kb = n => (n / 1024).toFixed(1) + ' KB';
-for (const s2 of sizes) {
-  console.log(s2.label.padEnd(9) + ' ' + kb(s2.raw).padStart(10) +
-    '  ->  ' + kb(s2.enc).padStart(10) + '   docs/' + s2.out);
-}
-console.log('password  ' + PASSWORD);
-
-console.log('\nwrote encrypted ' + sizes.map(s2 => 'docs/' + s2.out).join(', ') +
-  ' and protected docs/simulation/ — commit docs/, never source/.');
+console.log('Public static site ready in docs/. Main address: ' + site.href);

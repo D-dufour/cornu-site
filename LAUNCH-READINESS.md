@@ -1,58 +1,46 @@
-﻿# Launch readiness review - 13 September 2026
+# Public hosting readiness - 17 September 2026
 
-The private preview passes the website checks below. Public launch is still
-pending verified email delivery and the deliberate switch out of preview mode.
+The local website is prepared for https://cornu.ai on Yourhosting.
+The upload package is release/cornu-yourhosting.zip (about 12 MB).
+It contains 21 static files and requires no server-side Node.js process.
 
-## Fixed in this review
+## Completed
 
-- Contact enquiries now use a labelled, validated form with an explicit email
-  draft handoff, a copy button and a selectable-text fallback. No message is
-  reported as sent by the website.
-- The simulation entry page now requires the same preview password as the
-  marketing pages. Its supporting JavaScript and CSS remain public assets.
-- Added keyboard skip links, corrected the homepage main/footer landmarks,
-  removed a duplicate product link, and updated the simulation teaser wording.
-- Optimised the three oversized portraits for their displayed sizes. The
-  encrypted homepage is approximately 1.2 MB, down from approximately 6.4 MB.
-  The original photos remain available locally. Layout and scroll durations
-  are unchanged.
+- Removed the password screen and encryption from all four pages.
+- Replaced encrypted video payloads with three ordinary MP4 files.
+- Removed preview-password storage and browser decryption code.
+- Enabled search indexing and generated canonical URLs and sitemap.xml.
+- Preserved phone layouts, film controls and the interactive simulation.
+- Preserved incoming contact links after the opening animation.
+- Made marketing text accessible with JavaScript disabled, with direct
+  email links in place of interactive forms.
+- Added a repeatable Windows packaging script and Yourhosting setup guide.
 
 ## Verification
 
-- 13 browser checks passed: page links, careers role selection, application
-  validation and copy fallback, enquiry validation and copy fallback, film
-  playback and failure recovery, independent film controls, keyboard access,
-  unique IDs, password gates and simulation startup/controls.
-- Responsive browser viewports: 320x568, 390x844, 768x1024, 1024x768,
-  1440x1000 and 844x390. Visual review of desktop and phone layouts.
-- Eight simulation regression checks passed, including all six scenarios,
-  stopping before a blocked bridge and resetting state between runs. These
-  verify the demonstration simulation; they are not real-world product validation.
-- npm audit: zero reported dependency vulnerabilities.
-- HTTPS is enforced on the configured GitHub Pages site.
-- Browser automation used Microsoft Edge/Chromium. Physical-device and
-  Safari/Firefox certification are not implied by these checks.
+- All 15 browser checks passed in Microsoft Edge/Chromium against a local
+  static server, with no saved password or authentication setup.
+- Checks include public page access, crawlable HTML, SEO metadata, sitemap,
+  navigation, contact deep links, mobile simulation controls, form validation,
+  keyboard access, responsive widths from 320 to 1440 pixels, and MP4 loading,
+  playback, pause behaviour and recovery from a failed request.
+- All 21 ZIP entries match the generated website by SHA-256 and use forward
+  slash paths for extraction on Linux hosting.
+- All eight simulation regressions passed, covering six scenarios, stopping
+  before a blocked bridge and resetting simulation state.
+- git diff --check passed.
+- These are local checks; the Yourhosting deployment is not yet live.
 
-## Required before public enquiries and applications
+## Account setup still needed
 
-Both forms prepare emails; the visitor must send the draft in their email
-application, or copy the text into a message. There is no backend submission
-service and no application/CV storage on this site.
+Upload and extract the ZIP into the domain's document root, configure DNS
+using the values from the Yourhosting account, activate HTTPS, and redirect
+www to the preferred cornu.ai address. Follow YOURHOSTING-SETUP.md.
 
-On 13 September 2026, the local DNS lookup and Google's public DNS resolver
-returned no MX records for cornu.ai. This does not establish whether a specific
-mailbox can receive mail, but delivery to hello@cornu.ai and careers@cornu.ai
-has not been verified. Confirm working, monitored mailboxes and perform a real
-send/receive check before accepting public leads or applications. No email was
-sent during this review.
+The contact and careers forms prepare email drafts; visitors send them in
+their own email app or use the copy fallback. There is no backend submission
+or CV storage. Configure and test hello@cornu.ai and careers@cornu.ai before
+accepting public enquiries. A local MX lookup on 17 September 2026 returned
+no MX records; mailbox delivery has not been verified and no email was sent.
 
-## Public release settings
-
-The current site remains password-protected and excluded from search indexing,
-as requested. The configured URL is https://d-dufour.github.io/cornu-site/;
-GitHub Pages has no custom domain configured.
-
-An actual public release must deliberately remove the preview gates, publish
-indexable page content and update robots/indexing metadata. If cornu.ai is the
-intended website address, configure and verify that domain and HTTPS as part
-of that release. None of those public-release switches were made in this review.
+No hosting account, DNS records or existing live deployment was changed.

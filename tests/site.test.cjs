@@ -10,7 +10,7 @@ before(async()=>{
     if(file!==root&&!file.startsWith(root+path.sep)){res.writeHead(403).end();return;}
     if(fs.existsSync(file)&&fs.statSync(file).isDirectory())file=path.join(file,'index.html');
     if(!fs.existsSync(file)){res.writeHead(404).end();return;}
-    res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css'})[path.extname(file)]||'application/octet-stream');
+    res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.mp4':'video/mp4','.xml':'application/xml','.txt':'text/plain'})[path.extname(file)]||'application/octet-stream');
     res.end(fs.readFileSync(file));
   });
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base='http://127.0.0.1:'+server.address().port;
@@ -19,7 +19,6 @@ before(async()=>{
 after(async()=>{await browser?.close();await new Promise(resolve=>server?server.close(resolve):resolve());});
 async function open(url='/',viewport={width:1440,height:1000}){
   const context=await browser.newContext({viewport,reducedMotion:'reduce'});
-  await context.addInitScript(password=>sessionStorage.setItem('cornu.k',password),process.env.CORNU_PASSWORD||'cornu2026!');
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   page.on('console',m=>{if(m.type()==='error'&&m.text().startsWith('Cornu:'))errors.push(m.text());});
   await ready(page,url);return {context,page,errors};
@@ -145,18 +144,14 @@ test('phone simulation keeps the scene, playback, camera and scenario controls u
   }finally{await context.close();}
 });
 
-test('new careers page stays gated; home assets and original scroll stage sizes are preserved',async()=>{
-  const locked=await browser.newContext();
+test('careers opens publicly; home assets and original scroll stage sizes are preserved',async()=>{
+  const fresh=await browser.newContext();
   try{
-    const page=await locked.newPage();await page.goto(base+'/careers/');
-    assert.equal(await page.locator('#pw').isVisible(),true);
-    assert.equal(await page.locator('#applicationForm').count(),0);
-    await page.locator('#pw').fill('incorrect-test-password');await page.locator('#go').click();
-    await page.waitForFunction(()=>document.querySelector('#msg').classList.contains('bad'));
-    assert.equal(await page.locator('#applicationForm').count(),0);
-    await page.locator('#pw').fill(process.env.CORNU_PASSWORD||'cornu2026!');await page.locator('#go').click();
+    const page=await fresh.newPage();await page.goto(base+'/careers/');
+    assert.equal(await page.locator('input[type="password"]').count(),0);
     await page.locator('#applicationForm').waitFor();
-  }finally{await locked.close();}
+    assert.equal(await page.evaluate(()=>sessionStorage.length),0);
+  }finally{await fresh.close();}
   const {context,page,errors}=await open();
   try{
     assert.deepEqual(await page.locator('.track').evaluateAll(es=>es.map(e=>e.getBoundingClientRect().height)),[4200,3400,4600,4000,4200]);
@@ -167,16 +162,10 @@ test('new careers page stays gated; home assets and original scroll stage sizes 
   }finally{await context.close();}
 });
 
-test('film loads on demand behind the preview gate and plays inline on a phone',async()=>{
-  const locked=await browser.newContext();
-  try{
-    const page=await locked.newPage(),media=[];page.on('request',r=>{if(r.url().includes('/media/'))media.push(r.url());});
-    await page.goto(base+'/');await page.locator('#pw').waitFor();
-    assert.equal(await page.locator('#cornuFilm').count(),0);assert.deepEqual(media,[]);
-  }finally{await locked.close();}
+test('public film loads on demand and plays inline on a phone',async()=>{
   const {context,page,errors}=await open('/',{width:390,height:844});
   try{
-    const requests=[];page.on('request',r=>{if(r.url().includes('/media/'))requests.push(r.url());});
+    const requests=[];page.on('request',r=>{if(r.url().includes('/media/')&&!requests.includes(r.url()))requests.push(r.url());});
     await jump(page,'#film');
     assert.equal(await page.locator('#cornuFilm').getAttribute('src'),null);
     assert.deepEqual(requests,[],'Reduced motion must wait for a play request');
@@ -207,9 +196,9 @@ test('film autoplay pauses offscreen, respects manual pause and retries a failed
     await page.locator('#cornuFilm').evaluate(e=>e.scrollIntoView({behavior:'instant',block:'center'}));await page.waitForTimeout(200);
     assert.equal(await page.locator('#cornuFilm').evaluate(v=>v.paused),true,'Scrolling back must respect a manual pause');
     await page.emulateMedia({reducedMotion:'reduce'});await ready(page,'/');
-    await page.route('**/media/shot1.json',r=>r.abort());
+    await page.route('**/media/shot1.mp4',r=>r.abort());
     await page.locator('#filmPlay').click();await page.waitForFunction(()=>document.getElementById('filmStatus').textContent.includes('could not load'));
-    await page.unroute('**/media/shot1.json');await page.locator('#filmPlay').click();
+    await page.unroute('**/media/shot1.mp4');await page.locator('#filmPlay').click();
     await page.waitForFunction(()=>!document.getElementById('cornuFilm').paused);
     assert.deepEqual(errors,[]);
   }finally{await context.close();}
@@ -218,25 +207,25 @@ test('film autoplay pauses offscreen, respects manual pause and retries a failed
 test('Homepage films load independently and keep separate controls',async()=>{
   const {context,page,errors}=await open('/',{width:390,height:844});
   try{
-    const requests=[];page.on('request',r=>{if(r.url().includes('/media/'))requests.push(new URL(r.url()).pathname);});
+    const requests=[];page.on('request',r=>{const pathname=new URL(r.url()).pathname;if(pathname.includes('/media/')&&!requests.includes(pathname))requests.push(pathname);});
     await page.locator('#bridgeFilmFrame').scrollIntoViewIfNeeded();
     assert.equal(await page.locator('#cornuBridgeFilm').getAttribute('src'),null);
     assert.equal(await page.locator('#cornuFilm').getAttribute('src'),null);
     await page.locator('#bridgeFilmFrame .film-play').click();
     await page.waitForFunction(()=>{const v=document.getElementById('cornuBridgeFilm');return !v.paused&&v.currentTime>.1;});
-    assert.deepEqual(requests,['/media/shot2.json']);
+    assert.deepEqual(requests,['/media/shot2.mp4']);
     assert.equal(await page.locator('#cornuBridgeFilm').evaluate(v=>v.muted&&v.playsInline&&v.videoWidth===1920),true);
     assert.equal(await page.locator('#cornuFilm').getAttribute('src'),null);
     await fit(page,'Bridge Watch film');
     await page.locator('#filmPlay').click();
     await page.waitForFunction(()=>!document.getElementById('cornuFilm').paused&&document.getElementById('cornuBridgeFilm').paused);
-    assert.deepEqual(requests,['/media/shot2.json','/media/shot1.json']);
+    assert.deepEqual(requests,['/media/shot2.mp4','/media/shot1.mp4']);
     await page.locator('#bridgeFilmFrame .film-play').click();
     await page.waitForFunction(()=>!document.getElementById('cornuBridgeFilm').paused&&document.getElementById('cornuFilm').paused);
-    assert.equal(requests.length,2,'Returning to a loaded film must not download it again');
+    assert.equal(requests.length,2,'Returning to a film must not load unrelated media');
     await page.locator('#worldmodelFilmFrame .film-play').click();
     await page.waitForFunction(()=>{const v=document.getElementById('worldmodelFilm');return !v.paused&&v.currentTime>.1&&document.getElementById('cornuBridgeFilm').paused;});
-    assert.deepEqual(requests,['/media/shot2.json','/media/shot1.json','/media/shot3.json']);
+    assert.deepEqual(requests,['/media/shot2.mp4','/media/shot1.mp4','/media/shot3.mp4']);
     assert.ok(await page.locator('#worldmodelFilm').evaluate(v=>v.muted&&v.playsInline&&v.videoWidth===1920));
     await fit(page,'World model film');
     await page.locator('#simulation').scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.getElementById('worldmodelFilm').paused);
@@ -248,8 +237,8 @@ test('Bridge Watch product film resolves from its nested page and the concise la
   const {context,page,errors}=await open('/products/',{width:390,height:844});
   try{
     assert.equal(await page.locator('h1').innerText(),'Bridge Watch.');
-    assert.equal(await page.locator('#productFilm').getAttribute('data-encrypted-src'),'../media/shot2.json');
-    const media=page.waitForResponse(r=>r.url()===base+'/media/shot2.json');
+    assert.equal(await page.locator('#productFilm').getAttribute('data-src'),'../media/shot2.mp4');
+    const media=page.waitForResponse(r=>r.url()===base+'/media/shot2.mp4');
     await page.locator('#productFilmFrame .film-play').click();assert.equal((await media).status(),200);
     await page.waitForFunction(()=>{const v=document.getElementById('productFilm');return !v.paused&&v.currentTime>.1;});
     assert.ok(await page.locator('#productFilm').evaluate(v=>v.muted&&v.playsInline));
@@ -284,17 +273,49 @@ test('contact enquiry validates details, preserves the draft and offers a copy f
   }finally{await context.close();}
 });
 
-test('simulation cannot open directly without the preview password and starts after unlock',async()=>{
+test('simulation starts directly in a fresh browser without a password',async()=>{
   const context=await browser.newContext({viewport:{width:390,height:844}});
   try{
     const page=await context.newPage(),requests=[],errors=[];
     page.on('request',r=>{if(r.url().includes('/simulation/assets/'))requests.push(r.url());});
     page.on('pageerror',e=>errors.push(e.message));
-    await page.goto(base+'/simulation/');await page.locator('#pw').waitFor();
-    assert.equal(await page.locator('#scene').count(),0);assert.deepEqual(requests,[]);
-    await page.locator('#pw').fill(process.env.CORNU_PASSWORD||'cornu2026!');await page.locator('#go').click();
+    await page.goto(base+'/simulation/');
+    assert.equal(await page.locator('input[type="password"]').count(),0);
     await page.waitForFunction(()=>document.querySelector('#vesselRows')?.children.length>0);
     assert.equal(await page.locator('#scene').isVisible(),true);assert.ok(requests.length>0);assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+});
+
+test('public pages expose crawlable content, canonical URLs and a sitemap without JavaScript',async()=>{
+  const context=await browser.newContext({javaScriptEnabled:false});
+  try{
+    const page=await context.newPage();
+    for(const url of ['/','/products/','/careers/','/simulation/']){
+      const response=await page.goto(base+url);
+      assert.equal(response.status(),200);
+      const html=await response.text();
+      assert.doesNotMatch(html,/noindex|data-encrypted-src|crypto\.subtle|cornu\.k|type="password"/);
+      assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'),'https://cornu.ai'+url);
+      assert.equal(await page.locator('meta[name="robots"]').getAttribute('content'),'index, follow');
+      if(url!=='/simulation/'){
+        assert.equal(await page.locator('h1').isVisible(),true);
+        assert.equal(await page.locator('#loader').isVisible(),false);
+      }
+    }
+    const robots=await (await fetch(base+'/robots.txt')).text();
+    assert.match(robots,/Allow: \/\n/);assert.doesNotMatch(robots,/Disallow: \/\n/);
+    assert.match(robots,/Sitemap: https:\/\/cornu\.ai\/sitemap.xml/);
+    const sitemap=await (await fetch(base+'/sitemap.xml')).text();
+    for(const url of ['/','/products/','/careers/','/simulation/'])assert.ok(sitemap.includes('<loc>https://cornu.ai'+url+'</loc>'));
+    for(const film of ['shot1','shot2','shot3'])assert.equal((await fetch(base+'/media/'+film+'.json')).status,404);
+  }finally{await context.close();}
+});
+
+test('incoming contact links land on the correct section after the loader finishes',async()=>{
+  const {context,page}=await open('/#contact');
+  try{
+    await page.waitForFunction(()=>Math.abs(document.getElementById('contact').getBoundingClientRect().top-80)<5);
+    assert.equal(await page.locator('#contact').isVisible(),true);
   }finally{await context.close();}
 });
 

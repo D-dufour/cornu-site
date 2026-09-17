@@ -1,256 +1,41 @@
-# Cornu — private preview hosting
-
-Publishes the Cornu site to GitHub Pages behind a password.
-
-**Password:** `cornu2026!`
-
----
-
-## First, what this actually protects
-
-GitHub Pages is a static file host. There is no server, so there is nothing that
-can check a password before deciding what to send you. Any "enter a password"
-overlay on a static site can be skipped by opening the source — unless the page
-content itself is encrypted.
-
-So that is what this does. Each published page — `docs/index.html` and
-`docs/products/index.html` and `docs/careers/index.html` — contains:
-
-- the unlock screen, and
-- the entire site encrypted with **AES-256-GCM**, using a key derived from your
-  password with **PBKDF2-SHA256, 310,000 rounds** and a random salt.
-
-The password is not in the file. Nothing readable is in the file. Open the
-published page and "View source" and you get a login screen and a wall of
-base64. Decryption happens in the visitor's browser after they type the
-password correctly.
-
-**What it is good for:** keeping a pre-launch site away from casual visitors,
-search engines, competitors browsing around, and anyone you have not given the
-password to. For sharing a work-in-progress with investors, a design partner or
-a pilot customer, this is the right tool.
-
-**What it is not:** real access control. Be clear-eyed about three things.
-
-1. **Anyone with the password can pass it on.** There are no accounts, no
-   per-person links, no way to see who opened it.
-2. **The ciphertext is downloadable**, so an attacker can guess passwords
-   offline, as fast as their hardware allows, with no rate limit.
-   `cornu2026!` follows an extremely guessable pattern — a word, a year, a
-   punctuation mark. The 310,000 PBKDF2 rounds make each guess cost real time,
-   which stops casual attempts, but it will not stop somebody who specifically
-   targets you. If what is behind the gate ever becomes genuinely sensitive,
-   change to a long random passphrase (see below) — four unrelated words is
-   worth vastly more than adding symbols to one word.
-3. **Do not put anything confidential behind it.** A marketing site is fine.
-   Financial models, customer names, unfiled IP, anything under NDA — no.
-
-If you need actual authentication, jump to *Stronger options* at the bottom.
-
----
-
-## Publish it
-
-You need [git](https://git-scm.com) and a GitHub account.
-
-**1. Create the repository.** On GitHub, click New repository, name it
-`cornu-site`, leave it empty (no README), and create it.
-
-On a free account, GitHub Pages only works from a **public** repository. That is
-fine — the only thing being published is the encrypted file. The `.gitignore`
-in this folder keeps `source/` out of the repo, which is what makes that safe.
-Never remove that line.
-
-**2. Push this folder.** From inside it:
-
-```bash
-git init
-git add .
-git commit -m "Cornu site — encrypted preview"
-git branch -M main
-git remote add origin https://github.com/YOUR-USERNAME/cornu-site.git
-git push -u origin main
-```
-
-Before pushing, run `git status` once and confirm `source/` does **not** appear.
-
-**3. Turn on Pages.** In the repository: **Settings → Pages**. Under
-"Build and deployment", set Source to **Deploy from a branch**, branch **main**,
-folder **/docs**, and Save.
-
-**4. Wait a minute**, then open:
-
-```
-https://YOUR-USERNAME.github.io/cornu-site/
-```
-
-You should get the unlock screen. Type `cornu2026!`.
-
-The URL is ugly but real and shareable. To use `cornu.ai` instead, add a
-`CNAME` file containing your domain to `docs/`, point a DNS CNAME record at
-`YOUR-USERNAME.github.io`, and set the custom domain in Settings → Pages.
-
----
-
-## Change the password
-
-```bash
-CORNU_PASSWORD='four unrelated words here' node build.js
-git add docs && git commit -m "Rotate password" && git push
-```
-
-The old password stops working the moment the new file goes live — the site is
-re-encrypted, not just re-checked. This is also how you revoke access after
-sharing with someone: rotate and reshare.
-
-On Windows PowerShell:
-
-```powershell
-$env:CORNU_PASSWORD='four unrelated words here'; node build.js
-```
-
-Note the password is echoed in your terminal when the build runs, and lands in
-your shell history. If that matters, clear the history line afterwards.
-
----
-
-## Edit the site, then republish
-
-The real site lives in `source/`. Edit it exactly as before — team members,
-copy, colours, everything (see `source/README.md`). Preview your changes by
-opening a marketing page under `source/` directly in a
-browser; no password there.
-
-`docs/careers/index.html` contains the encrypted careers page; its authoring
-copy is `source/careers/index.html`.
-
-There are three marketing pages: `source/index.html` (home),
-`source/products/index.html` (Bridge Watch), and `source/careers/index.html`
-(role descriptions and applications). They share `source/assets/` and the
-same password. An unlocked visitor can navigate between them in the same tab.
-New pages belong in the `pages` array in `build.js`.
-
-The careers form validates the applicant's details and prepares an email to
-`careers@cornu.ai`. The applicant must send that draft in their email app;
-there is no server-side submission or file storage. A copy button and selectable
-text fallback support visitors without a configured email app. Applicants can
-link to their CV or attach it to the draft. Verify the hiring mailbox before
-accepting applications. Direct submission requires a configured form service.
-
-When it looks right:
-
-```bash
-node build.js
-git add docs
-git commit -m "Update team section"
-git push
-```
-
-Pages redeploys in under a minute. Hard-refresh (Cmd/Ctrl + Shift + R) to get
-past the browser cache.
-
-`build.js` inlines the CSS, JS and favicon into one document, checks that the
-script still compiles, encrypts the result and writes `docs/index.html`. It will
-refuse to build rather than ship something broken.
-
----
-
-## Notes on behaviour
-
-- After a correct password, the site is kept unlocked for that browser tab via
-  `sessionStorage`, so refreshing and following links does not re-prompt.
-  Closing the tab locks it again.
-- `robots.txt` disallows everything and the gate carries `noindex, nofollow`,
-  so it stays out of search results.
-- Decryption uses the Web Crypto API, which browsers only expose over
-  `https://` or `file://` — GitHub Pages is https, so this is fine. On very old
-  browsers the gate says so rather than failing silently.
-- The gate loads fonts from Google Fonts. If you would rather leak nothing at
-  all to a third party before unlock, delete the two `<link>` font tags from the
-  `gate()` template in `build.js`; the unlock screen will fall back to a system
-  monospace face.
-
----
-
-## Stronger options, if you outgrow this
-
-**Cloudflare Access** — free for up to 50 users, and it is real authentication:
-Cloudflare sits in front of the site and nobody reaches the files without
-passing. You get per-person access, an audit log, and instant revocation. It
-needs your domain on Cloudflare (free plan) and works with any static host.
-This is what I would move to once you are sharing with named people rather than
-a group.
-
-**Vercel or Netlify password protection** — one toggle, server-side, but on
-their paid tiers (Vercel Pro, Netlify Pro).
-
-**GitHub Pages from a private repo** — available on GitHub Pro and Team. Worth
-knowing: this hides the *source*, not the site. The published page is still
-public. It solves a different problem than the one you asked about.
-
----
-
-## Files
-
-```
-.
-├── build.js               inline → encrypt → write each page into docs/
-├── docs/                  what gets published (commit this)
-│   ├── index.html         unlock screen + encrypted home page
-│   ├── products/
-│   │   └── index.html     unlock screen + encrypted Bridge Watch page
-│   ├── simulation/        password-protected simulation entry page
-│   ├── robots.txt
-│   └── .nojekyll
-├── source/                the real site, unencrypted (never commit)
-│   ├── index.html         home
-│   ├── products/index.html  Bridge Watch
-│   ├── simulation/        simulation sources
-│   └── assets/            css, js, images shared by every page
-└── .gitignore             keeps source/ out of the repo
-```
-
-The simulation entry page now uses the same encrypted preview gate as the
-marketing pages. Its JavaScript and CSS remain ordinary public supporting
-assets; this gate protects the preview entry page, not the source code.
-
-## Simulation updates and verification
-
-The current deployed simulation is in docs/simulation/. Its authoring copy
-is source/simulation/; the root simulation/ folder is an earlier prototype.
-
-The navigation planner uses a static channel chart plus estimated contacts
-and measured bridge geometry. It evaluates full-hull trajectories with the
-same steering and engine model as the simulated vessel. Orders use absolute
-chart offsets, preserve clearance through the stern passing, and allow a
-full stop when there is no clear passage. The visible route shows the
-commanded trajectory. Clean view keeps calm water and a single route ribbon;
-Engineering restores prediction, corridor and sensor diagnostics.
-
-Run node --test tests/navigation.test.cjs after building. See tests/README.md
-for the regression checks and playback timing options. This is a simulation
-controller using estimated dimensions and channel-following traffic forecasts.
-
-
-## Homepage films
-
-The opening film uses `source/assets/videos/shot1.mp4`; the Bridge Watch
-section uses `source/assets/videos/shot2.mp4`. The world-model film, after
-the scroll-driven model section, uses `source/assets/videos/shot3.mp4`. Their posters live in
-`source/assets/img/film/` with the same filenames and a `.jpg` extension.
-The build encrypts the MP4s into `docs/media/shot1.json`, `shot2.json` and `shot3.json`
-using the preview password. Commit those encrypted files alongside the pages;
-keep the original media out of the public repo. Each player loads independently.
-
-The film loads only when it enters view or the visitor presses play. It starts
-muted, plays inline, pauses when offscreen or in a hidden tab, and respects a
-manual pause. Reduced-motion and data-saving preferences disable autoplay.
-Native controls provide seeking, sound and fullscreen playback.
-
-
-## Contact enquiries
-
-The contact form validates required details and prepares a draft to
-`hello@cornu.ai`, with copy and selectable-text fallbacks. The visitor must
-send the email to finish. There is no backend submission or data storage.
-See `LAUNCH-READINESS.md` for the latest checks and remaining launch items.
+# Cornu public website
+
+This site is a static website prepared for https://cornu.ai on Yourhosting.
+There is no password gate or server-side runtime. Pages are ordinary HTML,
+CSS and browser JavaScript; videos are standard MP4 files.
+
+Read [YOURHOSTING-SETUP.md](YOURHOSTING-SETUP.md) for upload, domain, HTTPS
+and email setup instructions. The upload archive is
+`release/cornu-yourhosting.zip`; only its contents belong on the server.
+
+## Editing and building
+
+Edit `source/index.html`, `source/products/index.html`,
+`source/careers/index.html`, and shared assets in `source/assets/`.
+The current simulation is authored in `source/simulation/`.
+The root `index.html`, `assets/` and `simulation/` are older prototypes;
+do not upload them.
+
+Run `node build.js` locally to generate `docs/`. The build bundles marketing
+page assets, copies the simulation and MP4 videos, and generates public
+robots metadata, canonical links and a sitemap. The default main address is
+https://cornu.ai/; set `CORNU_SITE_URL` to override it before building.
+
+On Windows, `powershell -NoProfile -ExecutionPolicy Bypass -File
+.\package-yourhosting.ps1` builds the site and creates the upload ZIP.
+The source folder remains ignored by Git, so retain a local backup of it.
+Published `docs/` files are now intentionally public and readable.
+
+## Verification
+
+Run `npm ci` to install local test dependencies, then `npm test` after a
+build. For installed Microsoft Edge in PowerShell set
+`$env:PW_CHANNEL='msedge'`; otherwise install the test browser with
+`npx playwright install chromium`. See [tests/README.md](tests/README.md).
+
+## Forms
+
+Contact and careers forms validate details and prepare an email draft, with
+copy and selectable-text fallbacks. The visitor sends the email. There is
+no form backend or CV storage. Configure and verify hello@cornu.ai and
+careers@cornu.ai before accepting enquiries or applications.

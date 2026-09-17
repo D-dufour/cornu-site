@@ -1,44 +1,29 @@
 # Website verification
 
-Install browser test dependencies with `npm ci`, then install Chromium with
-`npx playwright install chromium`. After building, run `npm test` to check
-career links, role selection, application validation and copy fallback, internal
-links, responsive layouts (320-1440 px, including landscape), keyboard menu
-behaviour, and simulation controls on a phone viewport. The tests use a local
-server and never send an application email.
+Install local browser dependencies with `npm ci`. Use installed Microsoft
+Edge by setting `$env:PW_CHANNEL='msedge'` in PowerShell, or install the test
+browser with `npx playwright install chromium`.
 
-To use an installed Microsoft Edge browser in PowerShell:
+Run `node build.js` then `npm test`. The browser suite serves `docs/` as
+static files and uses fresh sessions with no saved password. It checks:
 
-    $env:PW_CHANNEL='msedge'
-    npm test
+- Public pages and simulation startup without authentication.
+- Crawlable HTML without JavaScript, canonical URLs, robots and sitemap.
+- Navigation, contact deep links and careers role selection.
+- Phone, tablet and desktop layouts, keyboard controls and form labels.
+- Form validation and email-copy fallbacks (no email is sent).
+- Public MP4 playback, on-demand loading, independent controls, reduced
+  motion, offscreen/manual pause, and retry after a failed media request.
 
-The default preview password is used unless `CORNU_PASSWORD` is set. The suite
-checks the encrypted `docs/` output, so run `npm run build` after source changes.
+Run `npm run test:navigation` for simulation regressions. The suite runs
+all six scenarios for 660 simulated seconds each. It checks hulls against
+contacts and banks, progress past the bridge, stopping at a blocked bridge,
+and reset behaviour. These are demonstration simulation checks.
 
-Run the navigation regressions against the published simulation:
+Optional simulation environment variables: SIM_ROOT (default
+`docs/simulation`), SIM_SCENARIO, SIM_DURATION, SIM_STEP (default 0.1),
+and SIM_VERBOSE. Ground truth is used only in test assertions.
 
-    node --test tests/navigation.test.cjs
-
-The suite runs all six scenarios for 660 simulated seconds each. It checks
-actual hull polygons against every ground-truth contact and both banks,
-requires progress past the bridge, verifies stopping at an impassable bridge,
-and checks that looping/reset clears the previous model and commands.
-Ground truth is used by the test assertions only, never by route planning.
-
-Optional environment variables: SIM_ROOT (defaults to docs/simulation),
-SIM_SCENARIO, SIM_DURATION, SIM_STEP (defaults to 0.1 seconds), SIM_VERBOSE.
-For normal 60 FPS timing use SIM_STEP=0.016666666666666666; for 4x use
-SIM_STEP=0.06666666666666667.
-
-The local authoring tree is ignored by Git. Run node build.js after changing
-source/, then test the docs/ output before publishing. The older simulation/
-directory is an archived prototype; docs/simulation/ is the deployed app.
-
-
-Film checks cover on-demand loading after unlock, inline phone playback,
-original aspect ratio, reduced motion, offscreen and manual pause, and recovery
-from a failed media request. Playback uses the encrypted media output.
-
-Launch checks also cover contact enquiry validation/copy fallback, direct
-simulation access requiring the preview password, keyboard skip links, unique
-IDs and form labels. See LAUNCH-READINESS.md for external launch prerequisites.
+The public-domain assertions target https://cornu.ai/. If changing the main
+address, update those expectations alongside the build configuration.
+The older root `simulation/` directory is an archived prototype.

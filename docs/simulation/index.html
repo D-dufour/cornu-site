@@ -2,150 +2,160 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
-<title>Cornu</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23050706'/%3E%3Cg fill='none' stroke='%23C9F26E' stroke-width='4' stroke-linecap='round'%3E%3Cpath d='M32 56V30'/%3E%3Cpath d='M32 34 18 22'/%3E%3Cpath d='M32 34 46 22'/%3E%3Cpath d='M18 22 12 10'/%3E%3Cpath d='M18 22 24 12'/%3E%3Cpath d='M46 22 52 10'/%3E%3Cpath d='M46 22 40 12'/%3E%3C/g%3E%3C/svg%3E">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CORNU — Maritime Spatial Intelligence System</title>
+<meta name="description" content="Explore Cornu's interactive maritime simulation: vessel perception, sensor fusion and navigation through an inland waterway.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  :root{--carbon:#050706;--white:#F5F6F2;--muted:#79877D;--muted-2:#5A665E;--signal:#C9F26E;--ink:#0A0C0A;
-        --ease:cubic-bezier(.22,.61,.36,1)}
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%}
-  body{background:var(--carbon);color:var(--white);
-       font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;
-       display:grid;place-items:center;padding:24px;-webkit-font-smoothing:antialiased}
-  .gate{width:100%;max-width:340px;text-align:center}
-  svg{width:56px;height:56px;margin:0 auto}
-  svg path{stroke:var(--signal);fill:none;stroke-width:5;stroke-linecap:round;
-    stroke-dasharray:var(--len,420);stroke-dashoffset:var(--len,420);animation:draw .6s var(--ease) forwards}
-  @keyframes draw{to{stroke-dashoffset:0}}
-  .wm{font-family:"Archivo",Helvetica,Arial,sans-serif;font-weight:600;font-size:1rem;
-      letter-spacing:.42em;text-indent:.42em;margin-top:22px}
-  .note{font-size:.62rem;letter-spacing:.2em;text-transform:uppercase;color:var(--muted-2);
-        margin-top:14px;line-height:1.9}
-  form{margin-top:34px;display:flex;flex-direction:column;gap:12px}
-  input{background:transparent;border:0;border-bottom:1px solid rgba(245,246,242,.18);
-        color:var(--white);font:inherit;font-size:.95rem;letter-spacing:.06em;
-        padding:12px 0;text-align:center;border-radius:0;transition:border-color .3s var(--ease)}
-  input::placeholder{color:var(--muted-2);letter-spacing:.2em;font-size:.68rem;text-transform:uppercase}
-  input:focus{outline:none;border-bottom-color:var(--signal)}
-  button{background:var(--signal);color:var(--ink);border:0;border-radius:999px;
-         font:inherit;font-size:.68rem;font-weight:500;letter-spacing:.18em;text-transform:uppercase;
-         padding:14px 20px;cursor:pointer;transition:background .3s var(--ease)}
-  button:hover{background:#D9FA8C}
-  button:disabled{background:#3A4239;color:var(--muted-2);cursor:default}
-  .msg{font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted-2);
-       min-height:1.4em;margin-top:6px}
-  .msg.bad{color:#E0705F}
-  .bad-shake{animation:shake .3s var(--ease)}
-  @keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
-  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}
-    svg path{stroke-dashoffset:0}}
-</style>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/cornu.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23050706'/%3E%3Cg fill='none' stroke='%23C9F26E' stroke-width='4' stroke-linecap='round'%3E%3Cpath d='M32 56V30'/%3E%3Cpath d='M32 34 18 22'/%3E%3Cpath d='M32 34 46 22'/%3E%3Cpath d='M18 22 12 10'/%3E%3Cpath d='M18 22 24 12'/%3E%3Cpath d='M46 22 52 10'/%3E%3Cpath d='M46 22 40 12'/%3E%3C/g%3E%3C/svg%3E">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://cornu.ai/simulation/">
+<meta property="og:url" content="https://cornu.ai/simulation/">
 </head>
 <body>
-  <main class="gate">
-    <svg viewBox="0 0 64 64" aria-hidden="true">
-      <path d="M32 60V32"/><path d="M32 34 16 20"/><path d="M32 34 48 20"/>
-      <path d="M16 20 8 7"/><path d="M16 20 23 6"/><path d="M48 20 56 7"/><path d="M48 20 41 6"/>
-    </svg>
-    <div class="wm">CORNU</div>
-    <p class="note">Not public yet.<br>Enter the password to continue.</p>
-    <form id="f" autocomplete="off">
-      <input id="pw" type="password" placeholder="Password" aria-label="Password" autofocus>
-      <button id="go" type="submit">Enter</button>
-    </form>
-    <p class="msg" id="msg" role="status" aria-live="polite"></p>
-    <noscript><p class="note">Enable JavaScript to unlock this preview.</p></noscript>
+<div id="app">
+
+  <header>
+    <a class="brand" href="../" aria-label="Cornu — return to website">
+      <svg viewBox="0 0 64 64" fill="none" stroke="#C9F26E" stroke-width="5" stroke-linecap="round">
+        <path d="M32 60V32"/><path d="M32 34 16 20"/><path d="M32 34 48 20"/>
+        <path d="M16 20 8 7"/><path d="M16 20 23 6"/><path d="M48 20 56 7"/><path d="M48 20 41 6"/>
+      </svg>
+      <b>CORNU</b>
+      <span class="tag">Maritime spatial intelligence</span>
+    </a>
+
+    <div class="hdr-mid">
+      <div class="seg" id="scenarios">
+        <button data-v="normal" class="on">Normal</button>
+        <button data-v="bridge">Bridge</button>
+        <button data-v="collision">Collision</button>
+        <button data-v="obstacle">Obstacle</button>
+        <button data-v="sensorfail">Sensor fail</button>
+        <button data-v="occlusion">Occlusion</button>
+      </div>
+      <div class="seg" id="density">
+        <button data-v="clean" class="on">Clean</button>
+        <button data-v="dense">Engineering</button>
+      </div>
+      <div class="seg" id="viewModes">
+        <button data-v="model">World model</button>
+        <button data-v="blend" class="on">Blended</button>
+        <button data-v="truth">Ground truth</button>
+      </div>
+    </div>
+
+    <div class="hdr-right">
+      <span id="riskBadge">RISK NONE</span>
+      <span id="clock">00:00</span>
+    </div>
+  </header>
+
+  <nav class="mobile-panels" aria-label="Simulation information">
+    <button type="button" data-panel="vesselPanel" aria-controls="vesselPanel" aria-expanded="false">Vessel &amp; guidance</button>
+    <button type="button" data-panel="sensorPanel" aria-controls="sensorPanel" aria-expanded="false">Camera &amp; sensors</button>
+  </nav>
+
+  <aside class="left" id="vesselPanel" aria-label="Vessel and guidance">
+    <div class="block">
+      <h3>Own vessel</h3>
+      <div class="rows" id="vesselRows"></div>
+    </div>
+    <div class="block">
+      <h3>Navigation</h3>
+      <div class="rows" id="navRows"></div>
+    </div>
+    <div class="block">
+      <h3>Guidance</h3>
+      <div class="rows" id="guideRows"></div>
+    </div>
+    <div class="block">
+      <h3>Performance</h3>
+      <div class="rows" id="perfRows"></div>
+    </div>
+  </aside>
+
+  <main>
+    <canvas id="scene" aria-label="Interactive maritime simulation. Drag to rotate the view; tap a vessel to inspect it."></canvas>
+
+    <div class="overlay-tl">
+      <div class="mode">World model · active</div>
+    </div>
+
+    <div class="overlay-bl legend">
+      <div><i style="background:#C9F26E"></i>navigable corridor</div>
+      <div><i style="background:#F5F6F2"></i>own swept volume</div>
+      <div><i style="background:#E3C55C"></i>predicted / coasting</div>
+      <div><i style="background:#E0705F"></i>conflict</div>
+      <div><i style="background:#C9F26E"></i>ordered manoeuvre</div>
+    </div>
+
+    <div id="inspector">
+      <div class="insp-head">
+        <span id="inspTitle">—</span>
+        <button id="inspectorClose" aria-label="Close">✕</button>
+      </div>
+      <div class="insp-body">
+        <div class="rows" id="inspRows"></div>
+        <div id="inspSources"></div>
+      </div>
+    </div>
+
+    <div id="bootError"></div>
   </main>
 
-<script>
-(function(){
-  var D = {salt:"bA6iapoJLOmKpk03f/3l1w==", iv:"n8ZibvMm2r7PQtYV", ct:"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", it:310000};
-  var f=document.getElementById('f'), pw=document.getElementById('pw'),
-      go=document.getElementById('go'), msg=document.getElementById('msg');
+  <aside class="right" id="sensorPanel" aria-label="Camera and sensors">
+    <div class="block">
+      <h3>Perception</h3>
+      <div class="rows" id="perceptRows"></div>
+    </div>
+    <div class="block">
+      <h3>Camera</h3>
+      <div class="seg" id="camModes" style="flex-wrap:wrap">
+        <button data-v="chase" class="on">Chase</button>
+        <button data-v="bird">Bird</button>
+        <button data-v="bow">Bow</button>
+        <button data-v="free">Free</button>
+      </div>
+    </div>
+    <div class="block">
+      <h3>Layers</h3>
+      <div id="layers"></div>
+    </div>
+    <div class="block">
+      <h3>Sensors</h3>
+      <div id="sensorRows"></div>
+    </div>
+  </aside>
 
-  function b64(s){var b=atob(s),u=new Uint8Array(b.length);
-    for(var i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u;}
+  <footer>
+    <div id="alerts"></div>
+    <div class="controls">
+      <div class="seg" id="speeds">
+        <button data-v="0.25">0.25×</button>
+        <button data-v="0.5">0.5×</button>
+        <button data-v="1" class="on">1×</button>
+        <button data-v="2">2×</button>
+        <button data-v="4">4×</button>
+      </div>
+      <button id="playPause" class="on">Pause</button>
+      <button id="reset">Reset</button>
+    </div>
+  </footer>
 
-  async function open(password){
-    var enc=new TextEncoder();
-    var base=await crypto.subtle.importKey('raw',enc.encode(password),'PBKDF2',false,['deriveKey']);
-    var key=await crypto.subtle.deriveKey(
-      {name:'PBKDF2',salt:b64(D.salt),iterations:D.it,hash:'SHA-256'},
-      base,{name:'AES-GCM',length:256},false,['decrypt']);
-    var plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(D.iv)},key,b64(D.ct));
-    return new TextDecoder().decode(plain);
-  }
+</div>
 
-  function render(text){
-    var o = JSON.parse(text);
-    document.open();
-    document.write(o.h);
-    document.close();
-    /* run the site's script in its own task, and in function scope, so the
-       rewritten document's parser cannot also evaluate it */
-    setTimeout(function(){
-      try { new Function(o.j)(); }
-      catch (err) { console.error('Cornu: site script failed', err); }
-      jumpToHash();
-    }, 0);
-  }
-
-  /* A link from one page to an anchor on another — products/ back to
-     /#technology — arrives with a fragment the browser has already given up
-     on, because the document it names did not exist at load time. The site
-     also holds scrolling while the loader runs, so the jump waits for that
-     to finish rather than fighting it. */
-  function jumpToHash(){
-    if(!location.hash || location.hash.length < 2) return;
-    var target;
-    try { target = document.querySelector(location.hash); } catch(e) { return; }
-    if(!target) return;
-    var tries = 0;
-    (function go(){
-      var busy = document.body && document.body.classList.contains('is-loading');
-      if(busy && tries++ < 60){ setTimeout(go, 60); return; }
-      try { target.scrollIntoView(); } catch(e) { }
-    })();
-  }
-
-  async function attempt(password, quiet){
-    go.disabled=true; msg.className='msg'; msg.textContent=quiet?'':'Unlocking…';
-    try{
-      var html=await open(password);
-      try{ sessionStorage.setItem('cornu.k',password); }catch(e){}
-      render(html);
-    }catch(e){
-      go.disabled=false;
-      if(quiet){ msg.textContent=''; return; }
-      msg.className='msg bad'; msg.textContent='Wrong password.';
-      pw.value=''; pw.focus();
-      document.querySelector('.gate').classList.add('bad-shake');
-      setTimeout(function(){document.querySelector('.gate').classList.remove('bad-shake');},320);
-    }
-  }
-
-  f.addEventListener('submit',function(e){ e.preventDefault();
-    if(pw.value) attempt(pw.value,false); });
-
-  document.querySelectorAll('svg path').forEach(function(p,i){
-    var l=p.getTotalLength(); p.style.setProperty('--len',l);
-    p.style.animationDelay=[0,.28,.28,.52,.58,.52,.58][i]+'s';
-  });
-
-  if(!(window.crypto&&crypto.subtle)){
-    msg.className='msg bad';
-    msg.textContent='This browser cannot decrypt the page. Use a current browser over https.';
-    go.disabled=true;
-  } else {
-    var saved=null; try{ saved=sessionStorage.getItem('cornu.k'); }catch(e){}
-    if(saved) attempt(saved,true);
-  }
-})();
-</script>
+<script src="assets/js/00-config.js"></script>
+<script src="assets/js/01-math.js"></script>
+<script src="assets/js/10-world.js"></script>
+<script src="assets/js/20-sensors.js"></script>
+<script src="assets/js/30-tracking.js"></script>
+<script src="assets/js/35-navigation.js"></script>
+<script src="assets/js/40-worldmodel.js"></script>
+<script src="assets/js/50-renderer.js"></script>
+<script src="assets/js/60-ui.js"></script>
+<script src="assets/js/70-main.js"></script>
 </body>
 </html>
